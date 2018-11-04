@@ -159,7 +159,7 @@ NowPlay = 0
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
-version = 'version: 1.3.0'
+version = 'version: 1.5.0'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
