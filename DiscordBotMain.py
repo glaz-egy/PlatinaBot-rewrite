@@ -342,7 +342,7 @@ async def on_message(message):
                 PlayFlag = True
             except discord.errors.InvalidArgument:
                 pass
-            except:
+            except discord.ClientException:
                 await log.ErrorLog('Already Music playing')
                 await client.send_message(message.channel, 'Already Music playing')
             
