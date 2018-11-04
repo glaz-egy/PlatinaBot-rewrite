@@ -174,7 +174,8 @@ if len(PlayURL) == 0:
         with open('playlist.txt', 'r') as f:
             temp = f.readlines()
         for play in temp:
-            PlayURL.append(play.replace('\n', ''))
+            if not play == '':
+                PlayURL.append(play.replace('\n', ''))
     else:
         with open('playlist.txt', 'w') as f:
             pass
@@ -366,7 +367,7 @@ async def on_message(message):
                 PlayURL.append(link)
                 PlayURLs.append(link)
                 await log.MusicLog('Add {}'.format(link))
-                await client.send_message(message.channel, '{} が欲しかった！'.format('https://www.youtube.com/watch?v='+link))
+                await client.send_message(message.channel, '`{}` が欲しかった！'.format('https://www.youtube.com/watch?v='+link))
                 with open('playlist.txt', 'a') as f:
                     f.write('{}\n'.format(link))
             else:
@@ -394,7 +395,7 @@ async def on_message(message):
                 except:
                     pass
                 await log.MusicLog('Del {}'.format(link))
-                await client.send_message(message.channel, '{} なんてもういらないよね！'.format('https://www.youtube.com/watch?v='+link))
+                await client.send_message(message.channel, '`{}` なんてもういらないよね！'.format('https://www.youtube.com/watch?v='+link))
                 with open('playlist.txt', 'w') as f:
                     for URL in PlayURL:
                         f.write('{}\n'.format(URL))
