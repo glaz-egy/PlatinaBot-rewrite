@@ -113,7 +113,7 @@ class MusicPlayer:
         else:
             player.volume = 0.3
             entry = VoiceEntry(message, player)
-            await log.MusicLog('{}: {}'.format(player.title, player.url))
+            await log.MusicLog('{}: {}'.format(player.title, player.url).encode('utf-8'))
             await state.songs.put(entry)
 
     async def pause(self, message):
