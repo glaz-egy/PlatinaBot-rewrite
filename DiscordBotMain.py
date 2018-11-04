@@ -207,6 +207,9 @@ RoleCmdDict = {'`'+prefix+'role option`': '`!role`はオプションを必ず付
                 '`--add [RoleName]`': '自分に役職を追加します',
                 '`--del [RoleName]`': '自分の役職を消します',}
 
+TrueORFalse = {'Enable': True,
+                'Disable': False}
+
 async def NextSet(message):
     global NowPlay
     global player
@@ -422,12 +425,13 @@ async def on_message(message):
             for key, value in CommandDict.items():
                 await client.send_message(message.channel, '{}: {}'.format(key, value))
 
-    
+
     if message.content.startswith(prefix+'exit'):
         PassWord = message.content.split()[1]
         HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
         if HashWord == config['ADMINDATA']['passhash']:
             await log.Log('Bot exit')
+            await client.close()
             await sys.exit(0)
 
 @client.event
