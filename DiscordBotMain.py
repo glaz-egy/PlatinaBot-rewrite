@@ -227,7 +227,7 @@ async def ListOut(message):
         await client.send_message(message.channel, '`https://www.youtube.com/watch?v={}`\n'.format(url))
 
 async def PermissionErrorFunc(message):
-    await client.send_message(message.channel 'このコマンドは君じゃ使えないんだよなぁ')
+    await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
     await log.ErrorLog('Do not have permissions')
 
 @client.event
@@ -308,6 +308,7 @@ async def on_message(message):
             role = discord.utils.get(message.author.server.roles, name=RoleName)
             if role == None:
                 await client.create_role(message.server, name=RoleName, colour=discord.Colour(randint(0, 16777215)))
+                await client.send_message(message.channel, '{}は誰のものになるのかな？'.format(RoleName))
                 await log.Log('Create role: {}'.format(RoleName))
             else:
                 await client.send_message(message.channel, 'あるよ！ {} あるよッ！'.format(RoleName))
@@ -316,6 +317,7 @@ async def on_message(message):
         elif RemoveFlag:
             role = discord.utils.get(message.author.server.roles, name=RoleName)
             await client.delete_role(message.server, role)
+            await client.send_message(message.channel, '{}はもう消されてしまいました……'.format(RoleName))
             await log.Log('Remove role: {}'.format(RoleName))
             return
 
@@ -330,9 +332,11 @@ async def on_message(message):
             return
         elif AddFlag:
             await client.add_roles(message.author, role)
+            await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(message.author.name, RoleName))
             await log.Log('Add role: {} in {}'.format(message.author.name, RoleName))
         elif DelFlag:
             await client.remove_roles(message.author, role)
+            await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(message.author.name, RoleName))
             await log.Log('Del role: {}\'s {}'.format(message.author.name, RoleName))
 
     if message.content.startswith(prefix+'play'):
@@ -440,12 +444,21 @@ async def on_message(message):
                 await client.send_message(message.channel, '{}: {}'.format(key, value))
 
     if message.content.startswith(prefix+'exit'):
-        PassWord = message.content.split()[1]
-        HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
-        if HashWord == config['ADMINDATA']['passhash']:
+        if TrueORFalse[config['ADMINDATA']['passuse']]:
+            PassWord = message.content.split()[1]
+            HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
+            AdminCheck = (HashWord == config['ADMINDATA']['passhash'])
+        else:
+            AdminCheck = (message.author.id == config['ADMINDATA']['botowner'])
+        if AdminCheck:
             await log.Log('Bot exit')
             await client.close()
             await sys.exit(0)
+        else:
+            PermissionErrorFunc(message)
+    
+    if message.content.startswith(prefix+'debag'):
+        await on_member_join(message.author)
 
 @client.event
 async def on_member_join(member):
