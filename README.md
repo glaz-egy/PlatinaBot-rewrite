@@ -1,4 +1,4 @@
-# PlatinaBot　is DiscordBot for anything
+# PlatinaBot is DiscordBot for anything
 ## Need library
  `pip install -U discord.py`   
  `pip install PyNaCl youtube-dl`   

@@ -517,7 +517,7 @@ async def on_message(message):
 async def on_member_join(member):
     if TrueORFalse[config['JOINCONF']['joinevent']]:
         jointexts = config['JOINCONF']['jointext'].replace('\n', '')
-        jointexts = jointexts.split('@')
+        jointexts = jointexts.split('@/')
         text = jointexts[randint(0, len(jointexts)-1)].strip()
         channel = client.get_channel(config['BOTDATA']['mainch'])
         readme = client.get_channel(config['BOTDATA']['readmech'])
