@@ -297,14 +297,14 @@ async def on_message(message):
                 return
             CmdFlag = True
             AddFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del')+1)
+            RoleName = await CmdSpliter(cmd, cmd.index('--add')+1)
         if '--create' in cmd:
             if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             CreateFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del')+1)
+            RoleName = await CmdSpliter(cmd, cmd.index('--create')+1)
         if '--create-admin' in cmd:
             if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
@@ -312,14 +312,14 @@ async def on_message(message):
             CmdFlag = True
             CreateFlag = True
             AdminFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del')+1)
+            RoleName = await CmdSpliter(cmd, cmd.index('--create-admin')+1)
         if '--remove' in cmd:
             if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             RemoveFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del')+1)
+            RoleName = await CmdSpliter(cmd, cmd.index('--remove')+1)
         if not CmdFlag:
             if len(cmd) > 1:
                 await client.send_message(message.channel, 'オプションが間違っている気がするなぁ')
