@@ -16,15 +16,15 @@ import os
 class LogControl:
     def __init__(self, FileName):
         self.Name = FileName
-    
+
     async def Log(self, WriteText, write_type='a'):
         with open(self.Name, write_type) as f:
             f.write(datetime.now().strftime('[%Y/%m/%d %H:%M:%S]')+'[Bot Log] '+WriteText+'\n')
-    
+
     async def ErrorLog(self, WriteText, write_type='a'):
         with open(self.Name, write_type) as f:
             f.write(datetime.now().strftime('[%Y/%m/%d %H:%M:%S]')+'[Error Log] '+WriteText+'\n')
-    
+
     async def MusicLog(self, WriteText, write_type='a'):
         with open(self.Name, write_type) as f:
             f.write(datetime.now().strftime('[%Y/%m/%d %H:%M:%S]')+'[Music Log] '+WriteText+'\n')
@@ -52,7 +52,6 @@ class VoiceState:
     def is_playing(self):
         if self.voice is None or self.current is None:
             return False
-
         player = self.current.player
         return not player.is_done()
 
@@ -163,7 +162,7 @@ version = 'version: 1.5.0'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
-    config.read('config.ini')
+    config.read('config.ini', encoding='utf-8')
 else:
     log.ErrorLog('Config file not exist')
     sys.exit(1)
@@ -227,6 +226,10 @@ async def ListOut(message):
     for url in PlayURL:
         await client.send_message(message.channel, '`https://www.youtube.com/watch?v={}`\n'.format(url))
 
+async def PermissionErrorFunc(message):
+    await client.send_message(message.channel 'このコマンドは君じゃ使えないんだよなぁ')
+    await log.ErrorLog('Do not have permissions')
+
 @client.event
 async def on_ready():
     await log.Log('Bot is Logging in!!')
@@ -247,6 +250,7 @@ async def on_message(message):
         CmdFlag = False
         CreateFlag = False
         RemoveFlag = False
+        permissions = message.channel.permissions_for(message.author)
         cmd = message.content.split()
         if '--list' in cmd:
             CmdFlag = True
@@ -257,18 +261,30 @@ async def on_message(message):
             await log.Log('Confirmation role list')
             return
         if '--del' in cmd:
+            if TrueORFalse[config['ROLECONF']['del_role_me']] and not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
             CmdFlag = True
             DelFlag = True
             RoleName = cmd[cmd.index('--del')+1]
         if '--add' in cmd:
+            if TrueORFalse[config['ROLECONF']['add_role_me']] and not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
             CmdFlag = True
             AddFlag = True
             RoleName = cmd[cmd.index('--add')+1]
         if '--create' in cmd:
+            if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
             CmdFlag = True
             CreateFlag = True
             RoleName = cmd[cmd.index('--create')+1]
         if '--remove' in cmd:
+            if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
             CmdFlag = True
             RemoveFlag = True
             RoleName = cmd[cmd.index('--remove')+1]
@@ -348,7 +364,6 @@ async def on_message(message):
             except discord.ClientException:
                 await log.ErrorLog('Already Music playing')
                 await client.send_message(message.channel, 'Already Music playing')
-            
 
     if message.content.startswith(prefix+'next'):
         await log.MusicLog('Music skip')
@@ -360,7 +375,7 @@ async def on_message(message):
         PlayFlag = False
         player = None
         PlayURLs = deepcopy(PlayURL)
-        
+
     if message.content.startswith(prefix+'addmusic'):
         links = message.content.split()[1:]
         for link in links:
@@ -376,16 +391,16 @@ async def on_message(message):
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-    
+
     if message.content.startswith(prefix+'musiclist'):
         await ListOut(message)
-    
+
     if message.content.startswith(prefix+'pause'):
         await log.MusicLog('Music pause')
         await player.pause(message)
         PauseFlag = True
         PlayFlag = False
-    
+
     if message.content.startswith('!delmusic'):
         links = message.content.split()[1:]
         for link in links:
@@ -405,7 +420,6 @@ async def on_message(message):
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
-        
 
     if message.content.startswith(prefix+'version'):
         await log.Log(version)
@@ -425,7 +439,6 @@ async def on_message(message):
             for key, value in CommandDict.items():
                 await client.send_message(message.channel, '{}: {}'.format(key, value))
 
-
     if message.content.startswith(prefix+'exit'):
         PassWord = message.content.split()[1]
         HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
@@ -436,17 +449,16 @@ async def on_message(message):
 
 @client.event
 async def on_member_join(member):
-    channel = client.get_channel(config['BOTDATA']['mainch'])
-    readme = client.get_channel(config['BOTDATA']['readmech'])
-    rand = random()
-    if rand <= 0.25:
-        await client.send_message(channel, 'いらっしゃい **{}** さん、良ければ {} を見てくださいね'.format(member.name, readme.name))
-    elif rand <= 0.5:
-        await client.send_message(channel, 'ようこそ **{}** お兄ちゃん、{} を見て欲しいな 可愛い妹からのお願いだよ'.format(member.name, readme.name))
-    elif rand <= 0.75:
-        await client.send_message(channel, '{} は読むべきだと思うな **{}** さん'.format(readme.name, member.name))
-    else:
-        await client.send_message(channel, 'なぜ {} を読まないんだ **{}** 説明書を読まないと分からないことも有るだろ'.format(readme.name, member.name))
+    if TrueORFalse[config['JOINCONF']['joinevent']]:
+        jointexts = config['JOINCONF']['jointext'].replace('\n', '')
+        jointexts = jointexts.split('@')
+        text = jointexts[randint(0, len(jointexts)-1)].strip()
+        channel = client.get_channel(config['BOTDATA']['mainch'])
+        readme = client.get_channel(config['BOTDATA']['readmech'])
+        text = text.replace('[MenberName]', member.name)
+        text = text.replace('[ChannelName]', readme.name)
+        await client.send_message(channel, text)
+    await log.Log('Join {}'.format(member.name))
     print('Join {}'.format(member.name))
 
 
