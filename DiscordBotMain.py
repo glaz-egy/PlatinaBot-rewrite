@@ -158,7 +158,7 @@ NowPlay = 0
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
-version = 'version: 1.5.0'
+version = 'version: 2.0.0'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
@@ -202,6 +202,7 @@ RoleCmdDict = OrderedDict()
 RoleCmdDict = {'`'+prefix+'role option`': '`!role`はオプションを必ず付けてね！',
                 '`--list`': '現在ある役職を確認できます',
                 '`--create [RoleName]`': '役職を新しく作れます',
+                '`--create-admin [RoleName]`': '管理者権限を持つ役職を作ります(管理者のみ)',
                 '`--remove [RoleName]`': '役職を消せます',
                 '`--add [RoleName]`': '自分に役職を追加します',
                 '`--del [RoleName]`': '自分の役職を消します',}
@@ -223,9 +224,13 @@ async def NextSet(message):
 
 async def ListOut(message):
     await log.Log('Call playlist is {}'.format(PlayURL))
+    URLs = ''
     for url in PlayURL:
-        await client.send_message(message.channel, '`https://www.youtube.com/watch?v={}`\n'.format(url))
-
+        URLs += 'youtube.com/watch?v='+url+'\n'
+    embed = discord.Embed(colour=0x708090)
+    embed.add_field(name='曲リスト', value=URLs, inline=True)
+    await client.send_message(message.channel, embed=embed)
+            
 async def PermissionErrorFunc(message):
     await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
     await log.ErrorLog('Do not have permissions')
@@ -250,14 +255,25 @@ async def on_message(message):
         CmdFlag = False
         CreateFlag = False
         RemoveFlag = False
+        AdminFlag = False
         permissions = message.channel.permissions_for(message.author)
         cmd = message.content.split()
         if '--list' in cmd:
             CmdFlag = True
             RoleList = message.server.roles
+            AdminRoles = ''
+            NomalRoles = ''
             for Role in RoleList:
-                if not '@everyone' == Role.name:
-                    await client.send_message(message.channel, '`{}`'.format(Role.name))
+                if '@everyone' == Role.name:
+                    pass
+                elif Role.permissions.administrator:
+                    AdminRoles += Role.name+'\n'
+                else:
+                    NomalRoles += Role.name+'\n'
+            embed = discord.Embed(description='役職総リスト', colour=0x228b22)
+            embed.add_field(name='管理役職', value=AdminRoles, inline=True)
+            embed.add_field(name='非管理役職', value=NomalRoles, inline=True)
+            await client.send_message(message.channel, embed=embed)
             await log.Log('Confirmation role list')
             return
         if '--del' in cmd:
@@ -281,6 +297,14 @@ async def on_message(message):
             CmdFlag = True
             CreateFlag = True
             RoleName = cmd[cmd.index('--create')+1]
+        if '--create-admin' in cmd:
+            if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
+            CmdFlag = True
+            CreateFlag = True
+            AdminFlag = True
+            RoleName = cmd[cmd.index('--create-admin')+1]
         if '--remove' in cmd:
             if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
@@ -296,7 +320,6 @@ async def on_message(message):
             await client.send_message(message.channel, '`!role`だけじゃ何したいのか分からないんだけど')
             await log.ErrorLog('no option error')
             return
-
         if (CreateFlag or RemoveFlag) and (AddFlag or DelFlag):
             await client.send_message(message.channel, 'そのコマンドは両立出来ないなぁ')
             await log.ErrorLog('A command for the server and a command for the member are entered error')
@@ -307,20 +330,34 @@ async def on_message(message):
         elif CreateFlag:
             role = discord.utils.get(message.author.server.roles, name=RoleName)
             if role == None:
-                await client.create_role(message.server, name=RoleName, colour=discord.Colour(randint(0, 16777215)))
+                if AdminFlag:
+                    if permissions.administrator:
+                        per = discord.Permissions()
+                        per.administrator = True
+                        await client.create_role(message.server, permissions=per,name=RoleName, colour=discord.Colour(randint(0, 16777215)))
+                        await log.Log('Create admin role: {}'.format(RoleName))
+                    else:
+                        await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職を作成できません'.format(message.author.name))
+                        await log.Log('Create request higher level authority')
+                        return
+                else:
+                    await client.create_role(message.server, name=RoleName, colour=discord.Colour(randint(0, 16777215)))
+                    await log.Log('Create role: {}'.format(RoleName))
                 await client.send_message(message.channel, '{}は誰のものになるのかな？'.format(RoleName))
-                await log.Log('Create role: {}'.format(RoleName))
             else:
                 await client.send_message(message.channel, 'あるよ！ {} あるよッ！'.format(RoleName))
                 await log.Log('Role: {} is exist in this server yet'.format(RoleName))
             return
         elif RemoveFlag:
             role = discord.utils.get(message.author.server.roles, name=RoleName)
+            if role.permissions.administrator and not permissions.administrator:
+                await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職を削除できません'.format(message.author.name))
+                await log.Log('Deleate request higher level authority')
+                return
             await client.delete_role(message.server, role)
             await client.send_message(message.channel, '{}はもう消されてしまいました……'.format(RoleName))
             await log.Log('Remove role: {}'.format(RoleName))
             return
-
         if AddFlag and DelFlag:
             await client.send_message(message.channel, '追加するの？　消すの？　はっきりしてよ……')
             await log.ErrorLog('Add and Del command are entered')
@@ -331,6 +368,10 @@ async def on_message(message):
             await log.ErrorLog('Role: {} is not exist in this server'.format(RoleName))
             return
         elif AddFlag:
+            if role.permissions.administrator and not permissions.administrator:
+                await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職には成れません'.format(message.author.name))
+                await log.Log('Request higher level authority')
+                return
             await client.add_roles(message.author, role)
             await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(message.author.name, RoleName))
             await log.Log('Add role: {} in {}'.format(message.author.name, RoleName))
@@ -434,22 +475,34 @@ async def on_message(message):
         if len(cmds) > 1:
             for cmd in cmds:
                 if cmd == 'play':
+                    cmdline = ''
                     for key, value in PlayCmdDict.items():
-                        await client.send_message(message.channel, '{}: {}'.format(key, value))
+                        cmdline += key + ': ' + value + '\n'
+                    embed = discord.Embed(description='playコマンド関連リスト', colour=0xe9967a)
+                    embed.add_field(name='コマンドたち', value=cmdline, inline=True)
+                    await client.send_message(message.channel, embed=embed)
                 if cmd == 'role':
+                    cmdline = ''
                     for key, value in RoleCmdDict.items():
-                        await client.send_message(message.channel, '{}: {}'.format(key, value))
+                        cmdline += key + ': ' + value + '\n'
+                    embed = discord.Embed(description='roleコマンド関連リスト', colour=0x008b8b)
+                    embed.add_field(name='コマンドたち', value=cmdline, inline=True)
+                    await client.send_message(message.channel, embed=embed)
         else:
+            cmdline = ''
             for key, value in CommandDict.items():
-                await client.send_message(message.channel, '{}: {}'.format(key, value))
+                cmdline += key + ': ' + value + '\n'
+            embed = discord.Embed(description='コマンド確認リスト', colour=0x4169e1)
+            embed.add_field(name='コマンドたち', value=cmdline, inline=True)
+            await client.send_message(message.channel, embed=embed)
 
     if message.content.startswith(prefix+'exit'):
         if TrueORFalse[config['ADMINDATA']['passuse']]:
             PassWord = message.content.split()[1]
             HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
-            AdminCheck = (HashWord == config['ADMINDATA']['passhash'])
+            AdminCheck = (HashWord == config['ADMINDATA']['passhash'] if config['ADMINDATA']['passhash'] != 'None' else False)
         else:
-            AdminCheck = (message.author.id == config['ADMINDATA']['botowner'])
+            AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if AdminCheck:
             await log.Log('Bot exit')
             await client.close()
@@ -468,6 +521,8 @@ async def on_member_join(member):
         text = jointexts[randint(0, len(jointexts)-1)].strip()
         channel = client.get_channel(config['BOTDATA']['mainch'])
         readme = client.get_channel(config['BOTDATA']['readmech'])
+        if channel is None or readme is None:
+            return
         text = text.replace('[MenberName]', member.name)
         text = text.replace('[ChannelName]', readme.name)
         await client.send_message(channel, text)
