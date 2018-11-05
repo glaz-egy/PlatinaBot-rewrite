@@ -236,9 +236,11 @@ async def PermissionErrorFunc(message):
     await log.ErrorLog('Do not have permissions')
 
 def CmdSpliter(cmd, index):
-    if '"' in cmd[index]
-    tempStr = cmd[index] + ' ' + cmd[index+1]
-    SplitStr = tempStr.replace('"', '')
+    if '"' in cmd[index]:
+        tempStr = cmd[index] + ' ' + cmd[index+1]
+        SplitStr = tempStr.replace('"', '')
+    else:
+        SplitStr = cmd[index]
     return SplitStr
 
 @client.event
