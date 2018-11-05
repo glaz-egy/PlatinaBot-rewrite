@@ -235,6 +235,12 @@ async def PermissionErrorFunc(message):
     await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
     await log.ErrorLog('Do not have permissions')
 
+def CmdSpliter(cmd, index):
+    if '"' in cmd[index]
+    tempStr = cmd[index] + ' ' + cmd[index+1]
+    SplitStr = tempStr.replace('"', '')
+    return SplitStr
+
 @client.event
 async def on_ready():
     await log.Log('Bot is Logging in!!')
@@ -282,21 +288,21 @@ async def on_message(message):
                 return
             CmdFlag = True
             DelFlag = True
-            RoleName = cmd[cmd.index('--del')+1]
+            RoleName = CmdSpliter(cmd, cmd.index('--del')+1)
         if '--add' in cmd:
             if TrueORFalse[config['ROLECONF']['add_role_me']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             AddFlag = True
-            RoleName = cmd[cmd.index('--add')+1]
+            RoleName = CmdSpliter(cmd, cmd.index('--del')+1)
         if '--create' in cmd:
             if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             CreateFlag = True
-            RoleName = cmd[cmd.index('--create')+1]
+            RoleName = CmdSpliter(cmd, cmd.index('--del')+1)
         if '--create-admin' in cmd:
             if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
@@ -304,14 +310,14 @@ async def on_message(message):
             CmdFlag = True
             CreateFlag = True
             AdminFlag = True
-            RoleName = cmd[cmd.index('--create-admin')+1]
+            RoleName = CmdSpliter(cmd, cmd.index('--del')+1)
         if '--remove' in cmd:
             if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             RemoveFlag = True
-            RoleName = cmd[cmd.index('--remove')+1]
+            RoleName = CmdSpliter(cmd, cmd.index('--del')+1)
         if not CmdFlag:
             if len(cmd) > 1:
                 await client.send_message(message.channel, 'オプションが間違っている気がするなぁ')
