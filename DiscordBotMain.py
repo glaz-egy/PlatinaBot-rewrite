@@ -606,6 +606,7 @@ async def on_message(message):
             await sys.exit(0)
         else:
             PermissionErrorFunc(message)
+
     if message.content.startswith(prefix+'debag'):
         await on_member_join(message.author)
     
