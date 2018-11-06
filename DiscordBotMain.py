@@ -159,7 +159,7 @@ NextList = []
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
-version = 'version: 2.0.0'
+version = 'version: 2.1.0'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
@@ -189,15 +189,21 @@ client = discord.Client()
 
 CommandDict = OrderedDict()
 CommandDict = {'`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
-                '`'+prefix+'play`': '音楽を再生するかもしれないコマンド `{}help play`で詳しく確認できるよ！'.format(prefix),
+                '`'+prefix+'play`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
                 '`'+prefix+'version`': '現在のバージョンを確認できる',
                 '`'+prefix+'help`' : '今見てるのに説明いる？　ヘルプ用なんだけど'}
 
 PlayCmdDict = OrderedDict()
-PlayCmdDict = {'`'+prefix+'play [-r] [$url] [--list]`': '音楽を再生します　`-r`を付けるとランダム再生 `$[url]`でurlを優先再生 `--list`でプレイリストを確認',
-                '`'+prefix+'next`': '次の音楽を再生します',
-                '`'+prefix+'stop`': '音楽の再生をストップ＆ボイスチャネルから抜ける',
-                '`'+prefix+'pause`': '音楽の再生をストップ　次再生は続きから',
+PlayCmdDict = {'`'+prefix+'music option`': '音楽を再生します　`-r`を付けるとランダム再生 `$[url]`でurlを優先再生 `--list`でプレイリストを確認',
+                '`-r`': 'ランダム再生を有効にします `--next`または`--play`と同時に使ってもOK',
+                '`-n`': 'ランダム再生を無効にします 同上',
+                '`--list`': 'プレイリストを確認します',
+                '`--list-all`': '全てのプレイリストを確認します',
+                '`--list-make [PlayListName]`': 'プレイリストを作ります',
+                '`--list-change [PlayListName]`': '現在のプレイリストを変更します',
+                '`--next`': '次の曲へ移ります',
+                '`--stop`': '曲の再生をストップします',
+                '`--pause`': '曲の再生を一時停止します',
                 '`'+prefix+'addmusic url [url]...`': '音楽をプレイリストに追加',
                 '`'+prefix+'delmusic url [url]...`': 'プレイリストから削除',
                 '`'+prefix+'musiclist`': 'プレイリストを確認(廃止予定)'}
@@ -205,11 +211,11 @@ PlayCmdDict = {'`'+prefix+'play [-r] [$url] [--list]`': '音楽を再生しま�
 RoleCmdDict = OrderedDict()
 RoleCmdDict = {'`'+prefix+'role option`': '`!role`はオプションを必ず付けてね！',
                 '`--list`': '現在ある役職を確認できます',
-                '`--create [RoleName]`': '役職を新しく作れます',
-                '`--create-admin [RoleName]`': '管理者権限を持つ役職を作ります(管理者のみ)',
-                '`--remove [RoleName]`': '役職を消せます',
-                '`--add [RoleName]`': '自分に役職を追加します',
-                '`--del [RoleName]`': '自分の役職を消します',}
+                '`--create RoleName`': '役職を新しく作れます',
+                '`--create-admin RoleName`': '管理者権限を持つ役職を作ります(管理者のみ)',
+                '`--remove RoleName`': '役職を消せます',
+                '`--add RoleName`': '自分に役職を追加します',
+                '`--del RoleName`': '自分の役職を消します',}
 
 TrueORFalse = {'Enable': True,
                 'Disable': False}
@@ -222,21 +228,37 @@ async def NextSet(message):
     else:
         if not len(PlayURLs) == 0: NowPlay = randint(0, len(PlayURLs)-1)
         else: NowPlay = 0
-    await player.play(message, song='https://www.youtube.com/watch?v='+PlayURLs[NowPlay])
+    song = PlayURLs[NowPlay]
+    await player.play(message, song=('https://www.youtube.com/watch?v='+ song if not 'http' in song else song))
     await log.MusicLog('Set {}'.format(PlayURLs[NowPlay]))
     PlayURLs.remove(PlayURLs[NowPlay])
     if len(PlayURLs) == 0:
         PlayURLs = deepcopy(PlayListFiles[NowPlayList])
 
-async def ListOut(message):
+async def ListOut(message, all=False):
     global NowPlayList
-    await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
-    URLs = ''
-    for url in PlayListFiles[NowPlayList]:
-        URLs += 'youtube.com/watch?v='+url+'\n'
-    embed = discord.Embed(description='現在のプレイリスト', colour=0x708090)
-    embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs, inline=True)
-    await client.send_message(message.channel, embed=embed)
+    if all:
+        await log.Log('Play list check all')
+        URLs = []
+        keys = []
+        for key, value in PlayListFiles.items():
+            URLs.append('')
+            keys.append(key)
+            if key == NowPlayList: keys[-1] += '(現在のプレイリスト)'
+            for url in value:
+                URLs[-1] += ' '+url+'\n'
+        embed = discord.Embed(description='全てのプレイリスト', colour=0x6b8e23)
+        for i in range(len(keys)):
+            embed.add_field(name=keys[i], value=URLs[i], inline=True)
+        await client.send_message(message.channel, embed=embed)
+    else:
+        await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
+        URLs = ''
+        for url in PlayListFiles[NowPlayList]:
+            URLs += ' '+url+'\n'
+        embed = discord.Embed(description='現在のプレイリスト', colour=0x708090)
+        embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs, inline=True)
+        await client.send_message(message.channel, embed=embed)
             
 async def PermissionErrorFunc(message):
     await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
@@ -249,6 +271,14 @@ async def CmdSpliter(cmd, index):
     else:
         SplitStr = cmd[index]
     return SplitStr
+
+async def OptionError(message, cmd):
+    if len(cmd) > 1:
+        await client.send_message(message.channel, 'オプションが間違っている気がするなぁ')
+        await log.ErrorLog('The option is incorrect error')
+        return
+    await client.send_message(message.channel, '`'+cmd[0]+'`だけじゃ何したいのか分からないんだけど')
+    await log.ErrorLog('no option error') 
 
 @client.event
 async def on_ready():
@@ -327,12 +357,7 @@ async def on_message(message):
             RemoveFlag = True
             RoleName = await CmdSpliter(cmd, cmd.index('--remove')+1)
         if not CmdFlag:
-            if len(cmd) > 1:
-                await client.send_message(message.channel, 'オプションが間違っている気がするなぁ')
-                await log.ErrorLog('The option is incorrect error')
-                return
-            await client.send_message(message.channel, '`!role`だけじゃ何したいのか分からないんだけど')
-            await log.ErrorLog('no option error')
+            await OptionError(message, cmd)
             return
         if (CreateFlag or RemoveFlag) and (AddFlag or DelFlag):
             await client.send_message(message.channel, 'そのコマンドは両立出来ないなぁ')
@@ -396,9 +421,13 @@ async def on_message(message):
 
     if message.content.startswith(prefix+'music'):
         urlUseFlag = False
+        cmdFlag = False
         cmd = message.content.split()
         if '--list' in cmd:
             await ListOut(message)
+            return
+        if '--list-all' in cmd:
+            await ListOut(message, all=True)
             return
         if '--list-change' in cmd:
             temp = NowPlayList
@@ -449,7 +478,8 @@ async def on_message(message):
                 else: music = 0
                 try:
                     player = MusicPlayer(client)
-                    await player.play(message, song=('https://www.youtube.com/watch?v='+PlayURLs[music if RandomFlag else 0] if not urlUseFlag else url))
+                    song = PlayURLs[music if RandomFlag else 0] if not urlUseFlag else url
+                    await player.play(message, song=('https://www.youtube.com/watch?v='+ song if not 'http' in song else song))
                     if not urlUseFlag: PlayURLs.remove(PlayURLs[music if RandomFlag else 0])
                     if len(PlayURLs) == 0: PlayURLs = deepcopy(PlayListFiles[NowPlayList])
                     PlayFlag = True
@@ -458,20 +488,36 @@ async def on_message(message):
                 except discord.ClientException:
                     await log.ErrorLog('Already Music playing')
                     await client.send_message(message.channel, 'Already Music playing')
-        if '-r' in cmd: RandomFlag = True
-        if '-n' in cmd: RandomFlag = False
+            cmdFlag = True
+        if '-r' in cmd:
+            RandomFlag = True
+            cmdFlag = True
+        if '-n' in cmd:
+            RandomFlag = False
+            cmdFlag = True
         if '--next' in cmd:
             await log.MusicLog('Music skip')
             await player.skip(message)
+            cmdFlag = True
         if '--stop' in cmd:
             if player is None:
                 await client.send_message(message.channel, '今、プレイヤーは再生してないよ！')
                 await log.ErrorLog('Not play music')
+                return
             await log.MusicLog('Music stop')
             await player.stop(message)
             PlayFlag = False
             player = None
             PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+            cmdFlag = True
+        if '--pause' in cmd:
+            await log.MusicLog('Music pause')
+            await player.pause(message)
+            PauseFlag = True
+            PlayFlag = False
+            cmdFlag = True
+        if not cmdFlag:
+            await OptionError(message, cmd)
 
     if message.content.startswith(prefix+'addmusic'):
         links = message.content.split()[1:]
@@ -495,12 +541,6 @@ async def on_message(message):
 
     if message.content.startswith(prefix+'musiclist'):
         await ListOut(message)
-
-    if message.content.startswith(prefix+'pause'):
-        await log.MusicLog('Music pause')
-        await player.pause(message)
-        PauseFlag = True
-        PlayFlag = False
 
     if message.content.startswith('!delmusic'):
         links = message.content.split()[1:]
@@ -535,7 +575,7 @@ async def on_message(message):
         cmds = message.content.split()
         if len(cmds) > 1:
             for cmd in cmds:
-                if cmd == 'play':
+                if cmd == 'music':
                     cmdline = ''
                     for key, value in PlayCmdDict.items():
                         cmdline += key + ': ' + value + '\n'
