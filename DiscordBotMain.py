@@ -181,7 +181,7 @@ if len(PlayListFiles) == 0:
                 PlayListFiles[PlayListName[-1]].append(play.replace('\n', ''))
 NowPlayList = 'default'
 PlayURLs = deepcopy(PlayListFiles['default'])
-
+UnmodifiableRole = config['ROLECONF']['unmodif_role']
 client = discord.Client()
 
 CommandDict = OrderedDict()
@@ -398,6 +398,7 @@ async def on_message(message):
             await client.send_message(message.channel, '追加するの？　消すの？　はっきりしてよ……')
             await log.ErrorLog('Add and Del command are entered')
             return
+        isChange = (not RoleName in UnmodifiableRole) or (TrueORFalse[config['ROLECONF']['unmodif_admin']] and permissions.administrator)
         role = discord.utils.get(message.author.server.roles, name=RoleName)
         if role is None:
             await client.send_message(message.channel, 'そんな役職無いよ!')
@@ -408,13 +409,21 @@ async def on_message(message):
                 await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職には成れません'.format(message.author.name))
                 await log.Log('Request higher level authority')
                 return
-            await client.add_roles(message.author, role)
-            await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(message.author.name, RoleName))
-            await log.Log('Add role: {} in {}'.format(message.author.name, RoleName))
+            if isChange:
+                await client.add_roles(message.author, role)
+                await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(message.author.name, RoleName))
+                await log.Log('Add role: {} in {}'.format(message.author.name, RoleName))
+            else:
+                await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
+                await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
         elif DelFlag:
-            await client.remove_roles(message.author, role)
-            await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(message.author.name, RoleName))
-            await log.Log('Del role: {}\'s {}'.format(message.author.name, RoleName))
+            if isChange:
+                await client.remove_roles(message.author, role)
+                await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(message.author.name, RoleName))
+                await log.Log('Del role: {}\'s {}'.format(message.author.name, RoleName))
+            else:
+                await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
+                await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
 
     if message.content.startswith(prefix+'music'):
         urlUseFlag = False
