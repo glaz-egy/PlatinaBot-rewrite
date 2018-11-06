@@ -606,9 +606,15 @@ async def on_message(message):
             await sys.exit(0)
         else:
             PermissionErrorFunc(message)
-    
     if message.content.startswith(prefix+'debag'):
         await on_member_join(message.author)
+    
+    if message.content.startswith(prefix+'say'):
+        cmds = message.content.split()[1:]
+        out = ''
+        for cmd in cmds:
+            out += cmd+' '
+        client.send_message(message.channel, out)
 
 @client.event
 async def on_member_join(member):
