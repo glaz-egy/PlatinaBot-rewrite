@@ -179,9 +179,6 @@ if len(PlayListFiles) == 0:
         for play in temp:
             if not play == '':
                 PlayListFiles[PlayListName[-1]].append(play.replace('\n', ''))
-    else:
-        with open('playlist.txt', 'w') as f:
-            pass
 NowPlayList = 'default'
 PlayURLs = deepcopy(PlayListFiles['default'])
 
