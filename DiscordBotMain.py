@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from random import random, randint
-from collections import OrderedDict
-from copy import deepcopy
-from datetime import datetime
 from configparser import ConfigParser
+from collections import OrderedDict
+from random import random, randint
+from datetime import datetime
+from copy import deepcopy
+from glob import glob
 import discord
 import hashlib
 import asyncio
@@ -152,9 +153,9 @@ class MusicPlayer:
 
 MusicMessage = None
 player = None
-PlayURL = []
+PlayListFiles = {}
+PlayListName = []
 NextList = []
-NowPlay = 0
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
@@ -168,18 +169,21 @@ else:
     sys.exit(1)
 token = config['BOTDATA']['token']
 prefix = config['BOTDATA']['cmdprefix']
-if len(PlayURL) == 0:
-    if os.path.isfile('playlist.txt'):
-        with open('playlist.txt', 'r') as f:
+if len(PlayListFiles) == 0:
+    PLFList = glob('*.plf')
+    for PLF in PLFList:
+        PlayListName.append(PLF.replace('.plf', ''))
+        PlayListFiles[PlayListName[-1]] = []
+        with open(PLF, 'r') as f:
             temp = f.readlines()
         for play in temp:
             if not play == '':
-                PlayURL.append(play.replace('\n', ''))
+                PlayListFiles[PlayListName[-1]].append(play.replace('\n', ''))
     else:
         with open('playlist.txt', 'w') as f:
             pass
-
-PlayURLs = deepcopy(PlayURL)
+NowPlayList = 'default'
+PlayURLs = deepcopy(PlayListFiles['default'])
 
 client = discord.Client()
 
@@ -211,24 +215,27 @@ TrueORFalse = {'Enable': True,
                 'Disable': False}
 
 async def NextSet(message):
-    global NowPlay
+    global NowPlayList
     global player
     global PlayURLs
     if not RandomFlag: NowPlay = 0
-    else: NowPlay = randint(0, len(PlayURLs)-1)
+    else:
+        if not len(PlayURLs) == 0: NowPlay = randint(0, len(PlayURLs)-1)
+        else: NowPlay = 0
     await player.play(message, song='https://www.youtube.com/watch?v='+PlayURLs[NowPlay])
     await log.MusicLog('Set {}'.format(PlayURLs[NowPlay]))
     PlayURLs.remove(PlayURLs[NowPlay])
     if len(PlayURLs) == 0:
-        PlayURLs = deepcopy(PlayURL)
+        PlayURLs = deepcopy(PlayListFiles[NowPlayList])
 
 async def ListOut(message):
-    await log.Log('Call playlist is {}'.format(PlayURL))
+    global NowPlayList
+    await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
     URLs = ''
-    for url in PlayURL:
+    for url in PlayListFiles[NowPlayList]:
         URLs += 'youtube.com/watch?v='+url+'\n'
-    embed = discord.Embed(colour=0x708090)
-    embed.add_field(name='曲リスト', value=URLs, inline=True)
+    embed = discord.Embed(description='現在のプレイリスト', colour=0x708090)
+    embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs, inline=True)
     await client.send_message(message.channel, embed=embed)
             
 async def PermissionErrorFunc(message):
@@ -251,8 +258,7 @@ async def on_ready():
 async def on_message(message):
     global MusicMessage
     global player
-    global NowPlay
-    global PlayURL
+    global NowPlayList
     global PlayURLs
     global RandomFlag
     global PauseFlag
@@ -388,58 +394,100 @@ async def on_message(message):
             await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(message.author.name, RoleName))
             await log.Log('Del role: {}\'s {}'.format(message.author.name, RoleName))
 
-    if message.content.startswith(prefix+'play'):
+    if message.content.startswith(prefix+'music'):
         urlUseFlag = False
         cmd = message.content.split()
         if '--list' in cmd:
             await ListOut(message)
             return
-        if '-r' in cmd: RandomFlag = True
-        else: RandomFlag = False
+        if '--list-change' in cmd:
+            temp = NowPlayList
+            try:
+                NowPlayList = cmd[cmd.index('--list-change')+1]
+            except:
+                NowPlayList = 'default'
+            try:
+                PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+                await client.send_message(message.channel, 'プレイリストが{}から{}へ変更されました'.format(temp, NowPlayList))
+                await log.MusicLog('Play list change {} to {}'.format(temp, NowPlayList))
+            except:
+                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await log.ErrorLog('Request not exist Play list ')
+                NowPlayList = temp
+            return
+        if '--list-make' in cmd:
+            try:
+                PlayListName = cmd[cmd.index('--list-make')+1]
+            except:
+                await client.send_message(message.channel, 'オプションに引数が無いよ！')
+                await log.ErrorLog('Not argment')
+                return
+            if PlayListName in PlayListFiles.keys():
+                await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
+                await log.ErrorLog('Make request exit play list')
+            else:
+                with open(PlayListName+'.plf', 'w') as f:
+                    pass
+                NowPlayList = PlayListName
+                PlayListFiles[NowPlayList] = []
+                await client.send_message(message.channel, '新しくプレイリストが作成されました')
+                await log.MusicLog('Make play list {}'.format(PlayListName))
+            return
         if len(cmd) >= 2:
             for cmdpar in cmd:
                 if '$' in cmdpar:
                     urlUseFlag = True
                     url = cmdpar.replace('$', '')
         MusicMessage = message
-        if PauseFlag:
-            await player.resume(message)
-        else:
-            music = randint(0, len(PlayURLs)-1)
-            try:
-                player = MusicPlayer(client)
-                await player.play(message, song=('https://www.youtube.com/watch?v='+PlayURLs[music if RandomFlag else 0] if not urlUseFlag else url))
-                if not urlUseFlag: PlayURLs.remove(PlayURLs[music if RandomFlag else 0])
-                NowPlay = music if RandomFlag else 0
-                PlayFlag = True
-            except discord.errors.InvalidArgument:
-                pass
-            except discord.ClientException:
-                await log.ErrorLog('Already Music playing')
-                await client.send_message(message.channel, 'Already Music playing')
-
-    if message.content.startswith(prefix+'next'):
-        await log.MusicLog('Music skip')
-        await player.skip(message)
-
-    if message.content.startswith(prefix+'stop'):
-        await log.MusicLog('Music stop')
-        await player.stop(message)
-        PlayFlag = False
-        player = None
-        PlayURLs = deepcopy(PlayURL)
+        if '--play' in cmd:
+            RandomFlag = False
+            if '-r' in cmd: RandomFlag = True
+            if PauseFlag:
+                await player.resume(message)
+            else:
+                if not len(PlayURLs) == 0: music = randint(0, len(PlayURLs)-1)
+                else: music = 0
+                try:
+                    player = MusicPlayer(client)
+                    await player.play(message, song=('https://www.youtube.com/watch?v='+PlayURLs[music if RandomFlag else 0] if not urlUseFlag else url))
+                    if not urlUseFlag: PlayURLs.remove(PlayURLs[music if RandomFlag else 0])
+                    if len(PlayURLs) == 0: PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+                    PlayFlag = True
+                except discord.errors.InvalidArgument:
+                    pass
+                except discord.ClientException:
+                    await log.ErrorLog('Already Music playing')
+                    await client.send_message(message.channel, 'Already Music playing')
+        if '-r' in cmd: RandomFlag = True
+        if '-n' in cmd: RandomFlag = False
+        if '--next' in cmd:
+            await log.MusicLog('Music skip')
+            await player.skip(message)
+        if '--stop' in cmd:
+            if player is None:
+                await client.send_message(message.channel, '今、プレイヤーは再生してないよ！')
+                await log.ErrorLog('Not play music')
+            await log.MusicLog('Music stop')
+            await player.stop(message)
+            PlayFlag = False
+            player = None
+            PlayURLs = deepcopy(PlayListFiles[NowPlayList])
 
     if message.content.startswith(prefix+'addmusic'):
         links = message.content.split()[1:]
+        if links[0] in PlayListFiles.keys():
+            ListName = links[0]
+            links.remove(links[0])
+        else: ListName = NowPlayList
         for link in links:
             link = link.replace('https://www.youtube.com/watch?v=', '')
             link = link.replace('https://youtu.be/', '')
-            if not link in PlayURL:
-                PlayURL.append(link)
+            if not link in PlayListFiles[ListName]:
+                PlayListFiles[ListName].append(link)
                 PlayURLs.append(link)
                 await log.MusicLog('Add {}'.format(link))
                 await client.send_message(message.channel, '`{}` が欲しかった！'.format('https://www.youtube.com/watch?v='+link))
-                with open('playlist.txt', 'a') as f:
+                with open(ListName+'.plf', 'a') as f:
                     f.write('{}\n'.format(link))
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
@@ -456,19 +504,24 @@ async def on_message(message):
 
     if message.content.startswith('!delmusic'):
         links = message.content.split()[1:]
+        if links[0] in PlayListFiles.keys():
+            ListName = links[0]
+            links.remove(links[0])
+        else: ListName = NowPlayList
         for link in links:
             link = link.replace('https://www.youtube.com/watch?v=', '')
+            link = link.replace('youtube.com/watch?v=', '')
             link = link.replace('https://youtu.be/', '')
             try:
-                PlayURL.remove(link)
+                PlayListFiles[ListName].remove(link)
                 try:
                     PlayURLs.remove(link)
                 except:
                     pass
                 await log.MusicLog('Del {}'.format(link))
                 await client.send_message(message.channel, '`{}` なんてもういらないよね！'.format('https://www.youtube.com/watch?v='+link))
-                with open('playlist.txt', 'w') as f:
-                    for URL in PlayURL:
+                with open(ListName+'.plf', 'w') as f:
+                    for URL in PlayListFiles[ListName]:
                         f.write('{}\n'.format(URL))
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
@@ -505,12 +558,11 @@ async def on_message(message):
             await client.send_message(message.channel, embed=embed)
 
     if message.content.startswith(prefix+'exit'):
-        if TrueORFalse[config['ADMINDATA']['passuse']]:
+        AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
+        if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
             PassWord = message.content.split()[1]
             HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
             AdminCheck = (HashWord == config['ADMINDATA']['passhash'] if config['ADMINDATA']['passhash'] != 'None' else False)
-        else:
-            AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if AdminCheck:
             await log.Log('Bot exit')
             await client.close()
