@@ -159,7 +159,7 @@ NextList = []
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
-version = 'version: 2.1.0'
+version = 'version: 2.1.3'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
