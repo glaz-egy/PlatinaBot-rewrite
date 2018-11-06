@@ -615,7 +615,7 @@ async def on_message(message):
         out = ''
         for cmd in cmds:
             out += cmd+' '
-        client.send_message(message.channel, out)
+        await client.send_message(message.channel, out)
 
 @client.event
 async def on_member_join(member):
