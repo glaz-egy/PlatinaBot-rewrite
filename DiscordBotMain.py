@@ -304,7 +304,7 @@ async def on_message(message):
     global PlayFlag
     global IbotFlag
     global TittleFlag
-    if message.content.startswith(prefix+'role') and not message.content.author.bot:
+    if message.content.startswith(prefix+'role'):
         AddFlag = False
         DelFlag = False
         AddAnotherFlag = False
@@ -315,6 +315,9 @@ async def on_message(message):
         AdminFlag = False
         permissions = message.channel.permissions_for(message.author)
         cmd = message.content.split()
+        if message.content.author.bot:
+            await PermissionErrorFunc(message)
+            return
         if '--list' in cmd:
             CmdFlag = True
             RoleList = message.server.roles
