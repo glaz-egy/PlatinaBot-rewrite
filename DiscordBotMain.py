@@ -184,7 +184,7 @@ if len(PlayListFiles) == 0:
                 PlayListFiles[PlayListName[-1]].append(play.replace('\n', ''))
 NowPlayList = 'default'
 PlayURLs = deepcopy(PlayListFiles['default'])
-UnmodifiableRole = config['ROLECONF']['unmodif_role']
+UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
 client = discord.Client()
 
 CommandDict = OrderedDict()
@@ -251,7 +251,7 @@ async def ListOut(message, all=False):
         for key, value in PlayListFiles.items():
             URLs.append('')
             keys.append(key)
-            if key == NowPlayList: keys[-1] += '(現在のプレイリスト)'
+            if key == NowPlayList: keys[-1] += '(Now playlist)'
             for url in value:
                 URLs[-1] += ' '+url+'\n'
             if URLs[-1] == '':
@@ -327,9 +327,11 @@ async def on_message(message):
                 if '@everyone' == Role.name:
                     pass
                 elif Role.permissions.administrator:
-                    AdminRoles += Role.name+'\n'
+                    RoleName = Role.name + '(変更不可)' if Role.name in UnmodifiableRole else Role.name
+                    AdminRoles += RoleName+'\n'
                 else:
-                    NomalRoles += Role.name+'\n'
+                    RoleName = Role.name + '(変更不可)' if Role.name in UnmodifiableRole else Role.name
+                    NomalRoles += RoleName+'\n'
             embed = discord.Embed(description='役職総リスト', colour=0x228b22)
             embed.add_field(name='管理役職', value=AdminRoles, inline=True)
             embed.add_field(name='非管理役職', value=NomalRoles, inline=True)
