@@ -315,7 +315,7 @@ async def on_message(message):
         AdminFlag = False
         permissions = message.channel.permissions_for(message.author)
         cmd = message.content.split()
-        if message.content.author.bot:
+        if message.author.bot:
             await PermissionErrorFunc(message)
             return
         if '--list' in cmd:
