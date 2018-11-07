@@ -74,7 +74,7 @@ class VoiceState:
             self.play_next_song.clear()
             self.current = await self.songs.get()
             await NextSet(MusicMessage)
-            await self.bot.send_message(self.current.channel, 'Now playing **{}**'.format(self.current))
+            if TittleFlag: await self.bot.send_message(self.current.channel, 'Now playing **{}**'.format(self.current))
             self.current.player.start()
             await self.play_next_song.wait()
 
@@ -161,6 +161,7 @@ RandomFlag = False
 PauseFlag = False
 PlayFlag = False
 IbotFlag = False
+TittleFlag = True
 version = 'version: 2.2.0'
 log = LogControl('bot.log')
 config = ConfigParser()
@@ -295,6 +296,7 @@ async def on_message(message):
     global PauseFlag
     global PlayFlag
     global IbotFlag
+    global TittleFlag
     if message.content.startswith(prefix+'role'):
         DelFlag = False
         AddFlag = False
@@ -480,6 +482,7 @@ async def on_message(message):
         MusicMessage = message
         if '--play' in cmd:
             RandomFlag = False
+            TittleFlag = True
             if '-r' in cmd: RandomFlag = True
             if PauseFlag:
                 await player.resume(message)
@@ -504,6 +507,9 @@ async def on_message(message):
             cmdFlag = True
         if '-n' in cmd:
             RandomFlag = False
+            cmdFlag = True
+        if '--no-out' in cmd:
+            TittleFlag = False
             cmdFlag = True
         if '--next' in cmd:
             await log.MusicLog('Music skip')
