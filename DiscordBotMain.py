@@ -246,6 +246,8 @@ async def ListOut(message, all=False):
             if key == NowPlayList: keys[-1] += '(現在のプレイリスト)'
             for url in value:
                 URLs[-1] += ' '+url+'\n'
+            if URLs[-1] == '':
+                URLs[-1] = 'Empty'
         embed = discord.Embed(description='全てのプレイリスト', colour=0x6b8e23)
         for i in range(len(keys)):
             embed.add_field(name=keys[i], value=URLs[i], inline=True)
@@ -256,7 +258,7 @@ async def ListOut(message, all=False):
         for url in PlayListFiles[NowPlayList]:
             URLs += ' '+url+'\n'
         embed = discord.Embed(description='現在のプレイリスト', colour=0x708090)
-        embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs, inline=True)
+        embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs if URLs != '' else 'Empty', inline=True)
         await client.send_message(message.channel, embed=embed)
             
 async def PermissionErrorFunc(message):
