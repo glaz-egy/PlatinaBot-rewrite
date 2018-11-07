@@ -161,7 +161,7 @@ RandomFlag = False
 PauseFlag = False
 PlayFlag = False
 IbotFlag = False
-version = 'version: 2.1.4'
+version = 'version: 2.2.0'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
