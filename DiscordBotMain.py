@@ -435,19 +435,25 @@ async def on_message(message):
             return
         isChange = (not RoleName in UnmodifiableRole) or (TrueORFalse[config['ROLECONF']['unmodif_admin']] and permissions.administrator)
         role = discord.utils.get(message.author.server.roles, name=RoleName)
-        user = discord.utils.get(message.author.server.menbers, name=UserName)
         if role is None:
             await client.send_message(message.channel, 'そんな役職無いよ!')
             await log.ErrorLog('Role: {} is not exist in this server'.format(RoleName))
             return
-        elif user is None:
-            await client.send_message(message.channel, 'そんな人はいないんだけどな')
-            await log.ErrorLog('User: {} is not exist in this server'.format(UserName))
         elif AddAnotherFlag:
+            user = discord.utils.get(message.author.server.menbers, name=UserName)
+            if user is None:
+                await client.send_message(message.channel, 'そんな人はいないんだけどな')
+                await log.ErrorLog('User: {} is not exist in this server'.format(UserName))
+                return
             await client.add_roles(user, role)
             await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(UserName, RoleName))
             await log.Log('Add role: {} in {}'.format(UserName, RoleName))
         elif DelAnotherFlag:
+            user = discord.utils.get(message.author.server.menbers, name=UserName)
+            if user is None:
+                await client.send_message(message.channel, 'そんな人はいないんだけどな')
+                await log.ErrorLog('User: {} is not exist in this server'.format(UserName))
+                return
             await client.remove_roles(user, role)
             await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(UserName, RoleName))
             await log.Log('Del role: {}\'s {}'.format(UserName, RoleName))
