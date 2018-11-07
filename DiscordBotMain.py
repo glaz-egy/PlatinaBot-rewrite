@@ -6,6 +6,7 @@ from random import random, randint
 from datetime import datetime
 from copy import deepcopy
 from glob import glob
+import interabot
 import discord
 import hashlib
 import asyncio
@@ -19,15 +20,15 @@ class LogControl:
         self.Name = FileName
 
     async def Log(self, WriteText, write_type='a'):
-        with open(self.Name, write_type) as f:
+        with open(self.Name, write_type, encoding='utf-8',) as f:
             f.write(datetime.now().strftime('[%Y/%m/%d %H:%M:%S]')+'[Bot Log] '+WriteText+'\n')
 
     async def ErrorLog(self, WriteText, write_type='a'):
-        with open(self.Name, write_type) as f:
+        with open(self.Name, write_type, encoding='utf-8') as f:
             f.write(datetime.now().strftime('[%Y/%m/%d %H:%M:%S]')+'[Error Log] '+WriteText+'\n')
 
     async def MusicLog(self, WriteText, write_type='a'):
-        with open(self.Name, write_type) as f:
+        with open(self.Name, write_type, encoding='utf-8') as f:
             f.write(datetime.now().strftime('[%Y/%m/%d %H:%M:%S]')+'[Music Log] '+WriteText+'\n')
 
 class VoiceEntry:
@@ -159,6 +160,7 @@ NextList = []
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
+IbotFlag = False
 version = 'version: 2.1.4'
 log = LogControl('bot.log')
 config = ConfigParser()
@@ -290,6 +292,7 @@ async def on_message(message):
     global RandomFlag
     global PauseFlag
     global PlayFlag
+    global IbotFlag
     if message.content.startswith(prefix+'role'):
         DelFlag = False
         AddFlag = False
@@ -616,33 +619,41 @@ async def on_message(message):
         for cmd in cmds:
             out += cmd+' '
         await client.send_message(message.channel, out)
-    elif message.content.startswith(prefix+''):
+    elif message.content.startswith(prefix+'ibot'):
         cmd = message.content.split()[1:]
-        if '--start' in cmd:
-            if not IbotFlag:
-                IbotFlag = True
-                await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
-                await log.Log('Interactive bot mode is ON')
+        if TrueORFalse[config['BOTMODE']['ibot_mode']]:
+            if '--start' in cmd:
+                if not IbotFlag:
+                    IbotFlag = True
+                    await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
+                    await log.Log('Interactive bot mode is ON')
+                    await client.change_presence(game=discord.Game(name='IBOT'))
+                else:
+                    await client.send_message(message.channel, 'インタラクティブモードはすでにONになっています')
+                    await log.ErrorLog('Already interractive bot mode is ON')
+            elif '--stop' in cmd:
+                if IbotFlag:
+                    IbotFlag = False
+                    await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
+                    await log.Log('Interactive bot mode is OFF')
+                    await client.change_presence(game=None)
+                else:
+                    await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
+                    await log.ErrorLog('Already interractive bot mode is OFF')
             else:
-                await client.send_message(message.channel, 'インタラクティブモードはすでにONになっています')
-                await log.ErrorLot('Already interractive bot mode is ON')
-        elif '--stop' in cmd:
-            if IbotFlag:
-                IbotFlag = False
-                await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
-                await log.Log('Interactive bot mode is OFF')
-            else:
-                await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
-                await log.ErrorLot('Already interractive bot mode is OFF')
+                await OptionError(message, cmd)
         else:
-            await OptionError(message, cmd)
+            await client.send_message(message.channel, '現在このコマンドは無効化されています')
+            await log.ErrorLog('Ibot mode is Disable')
     elif message.content.startswith(prefix):
         await client.send_message(message.channel, '該当するコマンドがありません')
         await log.ErrorLog('Command is notfind')
-    elif IbotFlag:
-        comment = None
-        await client.send_message(message.channel, comment)
-        await log.Log('ibot return {}'.format(comment))
+    elif IbotFlag and not message.author.bot and 'はいどろ' in message.content:
+        bot = interabot.interabot.Bot()
+        comment = bot.Response(message.content)
+        if not comment is None:
+            await client.send_message(message.channel, comment)
+            await log.Log('ibot return {}'.format(comment))
         
 
 @client.event
