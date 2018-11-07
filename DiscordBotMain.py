@@ -265,7 +265,7 @@ async def ListOut(message, all=False):
         URLs = ''
         for url in PlayListFiles[NowPlayList]:
             URLs += ' '+url+'\n'
-        embed = discord.Embed(description='現在のプレイリスト', colour=0x708090)
+        embed = discord.Embed(description='Now playlist', colour=0x708090)
         embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs if URLs != '' else 'Empty', inline=True)
         await client.send_message(message.channel, embed=embed)
             
@@ -356,16 +356,16 @@ async def on_message(message):
                 return
             CmdFlag = True
             AddAnotherFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--add-another')+1)
-            UserName = await CmdSpliter(cmd, cmd.index('--add-another')+2)
+            RoleName = await CmdSpliter(cmd, cmd.index('--add-another')+2)
+            UserName = await CmdSpliter(cmd, cmd.index('--add-another')+1)
         if '--del-another' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             DelAnotherFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del-another')+1)
-            UserName = await CmdSpliter(cmd, cmd.index('--del-another')+2)
+            RoleName = await CmdSpliter(cmd, cmd.index('--del-another')+2)
+            UserName = await CmdSpliter(cmd, cmd.index('--del-another')+1)
         if '--create' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
