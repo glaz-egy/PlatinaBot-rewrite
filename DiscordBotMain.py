@@ -162,7 +162,7 @@ PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TittleFlag = True
-version = 'version: 2.2.0'
+version = 'version: 2.3.0'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'):
@@ -190,8 +190,11 @@ client = discord.Client()
 CommandDict = OrderedDict()
 CommandDict = {'`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
                 '`'+prefix+'play`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
+                '`'+prefix+'say SayText`': 'ボットがSayTextの内容を発言します それだけのコマンド',
+                '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします ボットの認識子はいまのところ「はいどろ」 また、現在は「今何時」にのみ対応',
                 '`'+prefix+'version`': '現在のバージョンを確認できる',
-                '`'+prefix+'help`' : '今見てるのに説明いる？　ヘルプ用なんだけど'}
+                '`'+prefix+'help`' : '今見てるのに説明いる？　ヘルプ用なんだけど',
+                '`'+prefix+'exit [ExitPassword]`': 'ボット管理者かExitPasswordを知っている人のみボットを停止できます'}
 
 PlayCmdDict = OrderedDict()
 PlayCmdDict = {'`'+prefix+'music option`': '音楽を再生します　`-r`を付けるとランダム再生 `$[url]`でurlを優先再生 `--list`でプレイリストを確認',
@@ -199,8 +202,10 @@ PlayCmdDict = {'`'+prefix+'music option`': '音楽を再生します　`-r`を�
                 '`-n`': 'ランダム再生を無効にします 同上',
                 '`--list`': 'プレイリストを確認します',
                 '`--list-all`': '全てのプレイリストを確認します',
-                '`--list-make [PlayListName]`': 'プレイリストを作ります',
-                '`--list-change [PlayListName]`': '現在のプレイリストを変更します',
+                '`--list-make PlayListName`': 'プレイリストを作ります',
+                '`--list-change PlayListName`': '現在のプレイリストを変更します',
+                '`--list-remove PlayListName`' : 'プレイリストを削除します 現在のプレイリストはdefaultに変更されます',
+                '`--no-out`': '曲名の出力をしないようにするオプションです　標準では出力される様になっています',
                 '`--next`': '次の曲へ移ります',
                 '`--stop`': '曲の再生をストップします',
                 '`--pause`': '曲の再生を一時停止します',
@@ -215,7 +220,9 @@ RoleCmdDict = {'`'+prefix+'role option`': '`!role`はオプションを必ず付
                 '`--create-admin RoleName`': '管理者権限を持つ役職を作ります(管理者のみ)',
                 '`--remove RoleName`': '役職を消せます',
                 '`--add RoleName`': '自分に役職を追加します',
-                '`--del RoleName`': '自分の役職を消します',}
+                '`--del RoleName`': '自分の役職を消します',
+                '`--add-another UserName RoleName`': '`UserName`の役職を追加します(管理者のみ)',
+                '`--del-another UserName RoleName`': '`UserName`から役職を削除します(管理者のみ)'}
 
 TrueORFalse = {'Enable': True,
                 'Disable': False}
@@ -297,9 +304,11 @@ async def on_message(message):
     global PlayFlag
     global IbotFlag
     global TittleFlag
-    if message.content.startswith(prefix+'role'):
-        DelFlag = False
+    if message.content.startswith(prefix+'role') and not message.content.author.bot:
         AddFlag = False
+        DelFlag = False
+        AddAnotherFlag = False
+        DelAnotherFlag = False
         CmdFlag = False
         CreateFlag = False
         RemoveFlag = False
@@ -338,8 +347,24 @@ async def on_message(message):
             CmdFlag = True
             AddFlag = True
             RoleName = await CmdSpliter(cmd, cmd.index('--add')+1)
+        if '--add-another' in cmd:
+            if not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
+            CmdFlag = True
+            AddAnotherFlag = True
+            RoleName = await CmdSpliter(cmd, cmd.index('--add-another')+1)
+            UserName = await CmdSpliter(cmd, cmd.index('--add-another')+2)
+        if '--del-another' in cmd:
+            if not permissions.administrator:
+                await PermissionErrorFunc(message)
+                return
+            CmdFlag = True
+            DelAnotherFlag = True
+            RoleName = await CmdSpliter(cmd, cmd.index('--del-another')+1)
+            UserName = await CmdSpliter(cmd, cmd.index('--del-another')+2)
         if '--create' in cmd:
-            if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
+            if not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
@@ -401,16 +426,28 @@ async def on_message(message):
             await client.send_message(message.channel, '{}はもう消されてしまいました……'.format(RoleName))
             await log.Log('Remove role: {}'.format(RoleName))
             return
-        if AddFlag and DelFlag:
+        if AddFlag and DelFlag or AddAnotherFlag and DelAnotherFlag:
             await client.send_message(message.channel, '追加するの？　消すの？　はっきりしてよ……')
             await log.ErrorLog('Add and Del command are entered')
             return
         isChange = (not RoleName in UnmodifiableRole) or (TrueORFalse[config['ROLECONF']['unmodif_admin']] and permissions.administrator)
         role = discord.utils.get(message.author.server.roles, name=RoleName)
+        user = discord.utils.get(message.author.server.menbers, name=UserName)
         if role is None:
             await client.send_message(message.channel, 'そんな役職無いよ!')
             await log.ErrorLog('Role: {} is not exist in this server'.format(RoleName))
             return
+        elif user is None:
+            await client.send_message(message.channel, 'そんな人はいないんだけどな')
+            await log.ErrorLog('User: {} is not exist in this server'.format(UserName))
+        elif AddAnotherFlag:
+            await client.add_roles(user, role)
+            await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(UserName, RoleName))
+            await log.Log('Add role: {} in {}'.format(UserName, RoleName))
+        elif DelAnotherFlag:
+            await client.remove_roles(user, role)
+            await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(UserName, RoleName))
+            await log.Log('Del role: {}\'s {}'.format(UserName, RoleName))
         elif AddFlag:
             if role.permissions.administrator and not permissions.administrator:
                 await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職には成れません'.format(message.author.name))
@@ -465,7 +502,7 @@ async def on_message(message):
                 return
             if PlayListName in PlayListFiles.keys():
                 await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
-                await log.ErrorLog('Make request exit play list')
+                await log.ErrorLog('Make request exist play list')
             else:
                 with open(PlayListName+'.plf', 'w') as f:
                     pass
@@ -473,6 +510,23 @@ async def on_message(message):
                 PlayListFiles[NowPlayList] = []
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
                 await log.MusicLog('Make play list {}'.format(PlayListName))
+            return
+        if '--list-remove' in cmd:
+            try:
+                PlayListName = cmd[cmd.index('--list-make')+1]
+            except:
+                await client.send_message(message.channel, 'オプションに引数が無いよ！')
+                await log.ErrorLog('Not argment')
+                return
+            if PlayListName in PlayListFiles.keys() and not 'default' == PlayListName:
+                del PlayListFiles[PlayListName]
+                os.remove(PlayListName+'.plf')
+                await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
+                await log.MusicLog('Remove play list {}'.format(PlayListName))
+                NowPlayList = 'default'
+            else:
+                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await log.ErrorLog('Remove request not exist play list')
             return
         if len(cmd) >= 2:
             for cmdpar in cmd:
