@@ -424,8 +424,7 @@ async def on_message(message):
             else:
                 await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
-
-    if message.content.startswith(prefix+'music'):
+    elif message.content.startswith(prefix+'music'):
         urlUseFlag = False
         cmdFlag = False
         cmd = message.content.split()
@@ -524,8 +523,7 @@ async def on_message(message):
             cmdFlag = True
         if not cmdFlag:
             await OptionError(message, cmd)
-
-    if message.content.startswith(prefix+'addmusic'):
+    elif message.content.startswith(prefix+'addmusic'):
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
             ListName = links[0]
@@ -544,11 +542,9 @@ async def on_message(message):
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-
-    if message.content.startswith(prefix+'musiclist'):
+    elif message.content.startswith(prefix+'musiclist'):
         await ListOut(message)
-
-    if message.content.startswith('!delmusic'):
+    elif message.content.startswith('!delmusic'):
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
             ListName = links[0]
@@ -572,12 +568,10 @@ async def on_message(message):
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
-
-    if message.content.startswith(prefix+'version'):
+    elif message.content.startswith(prefix+'version'):
         await log.Log(version)
         await client.send_message(message.channel, version)
-
-    if message.content.startswith(prefix+'help'):
+    elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
         if len(cmds) > 1:
             for cmd in cmds:
@@ -602,8 +596,7 @@ async def on_message(message):
             embed = discord.Embed(description='コマンド確認リスト', colour=0x4169e1)
             embed.add_field(name='コマンドたち', value=cmdline, inline=True)
             await client.send_message(message.channel, embed=embed)
-
-    if message.content.startswith(prefix+'exit'):
+    elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
             PassWord = message.content.split()[1]
@@ -615,16 +608,42 @@ async def on_message(message):
             await sys.exit(0)
         else:
             PermissionErrorFunc(message)
-
-    if message.content.startswith(prefix+'debag'):
+    elif message.content.startswith(prefix+'debag'):
         await on_member_join(message.author)
-    
-    if message.content.startswith(prefix+'say'):
+    elif message.content.startswith(prefix+'say'):
         cmds = message.content.split()[1:]
         out = ''
         for cmd in cmds:
             out += cmd+' '
         await client.send_message(message.channel, out)
+    elif message.content.startswith(prefix+''):
+        cmd = message.content.split()[1:]
+        if '--start' in cmd:
+            if not IbotFlag:
+                IbotFlag = True
+                await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
+                await log.Log('Interactive bot mode is ON')
+            else:
+                await client.send_message(message.channel, 'インタラクティブモードはすでにONになっています')
+                await log.ErrorLot('Already interractive bot mode is ON')
+        elif '--stop' in cmd:
+            if IbotFlag:
+                IbotFlag = False
+                await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
+                await log.Log('Interactive bot mode is OFF')
+            else:
+                await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
+                await log.ErrorLot('Already interractive bot mode is OFF')
+        else:
+            await OptionError(message, cmd)
+    elif message.content.startswith(prefix):
+        await client.send_message(message.channel, '該当するコマンドがありません')
+        await log.ErrorLog('Command is notfind')
+    elif IbotFlag:
+        comment = None
+        await client.send_message(message.channel, comment)
+        await log.Log('ibot return {}'.format(comment))
+        
 
 @client.event
 async def on_member_join(member):
