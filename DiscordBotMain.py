@@ -586,7 +586,7 @@ async def on_message(message):
                 await client.send_message(message.channel, '今、プレイヤーは再生してないよ！')
                 await log.ErrorLog('Not play music')
                 return
-            await client.change_presence(game=None)
+            await client.change_presence(game=(None if not IbotFlag else discord.Game(name='IBOT')))
             await log.MusicLog('Music stop')
             await player.stop(message)
             PlayFlag = False
@@ -597,7 +597,6 @@ async def on_message(message):
             await log.MusicLog('Music pause')
             await player.pause(message)
             PauseFlag = True
-            PlayFlag = False
             cmdFlag = True
         if not cmdFlag:
             await OptionError(message, cmd)
@@ -711,7 +710,7 @@ async def on_message(message):
                     IbotFlag = False
                     await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
                     await log.Log('Interactive bot mode is OFF')
-                    await client.change_presence(game=None)
+                    await client.change_presence(game=(None if not PlayFlag else discord.Game(name='IBOMusicPlayerT')))
                 else:
                     await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
                     await log.ErrorLog('Already interractive bot mode is OFF')
