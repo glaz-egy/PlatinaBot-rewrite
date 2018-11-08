@@ -11,7 +11,7 @@ TimeZone = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
 class Bot:
     def __init__(self):
-        pass
+        self.__version__ = 'interabot version: 0.0.2'
 
     def Response(self, text):
         if '今何時' in text:

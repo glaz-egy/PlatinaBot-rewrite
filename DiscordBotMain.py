@@ -151,6 +151,7 @@ class MusicPlayer:
 
 MusicMessage = None
 player = None
+InteractiveBot = None
 PlayListFiles = {}
 PlayListName = []
 NextList = []
@@ -159,7 +160,7 @@ PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TittleFlag = True
-version = 'version: 2.3.1'
+version = 'PlatinaBot version: 2.3.1'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'): config.read('config.ini', encoding='utf-8')
@@ -288,6 +289,7 @@ async def on_ready():
 async def on_message(message):
     global MusicMessage
     global player
+    global InteractiveBot
     global NowPlayList
     global PlayURLs
     global RandomFlag
@@ -630,9 +632,6 @@ async def on_message(message):
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
-    elif message.content.startswith(prefix+'version'):
-        await log.Log(version)
-        await client.send_message(message.channel, version)
     elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
         if len(cmds) > 1:
@@ -658,6 +657,12 @@ async def on_message(message):
             embed = discord.Embed(description='コマンド確認リスト', colour=0x4169e1)
             embed.add_field(name='コマンドたち', value=cmdline, inline=True)
             await client.send_message(message.channel, embed=embed)
+    elif message.content.startswith(prefix+'version'):
+        await log.Log(version)
+        await client.send_message(message.channel, version)
+        if IbotFlag:
+            await log.Log(InteractiveBot.__version__)
+            await client.send_message(message.channel, InteractiveBot.__version__)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
@@ -683,6 +688,7 @@ async def on_message(message):
             if '--start' in cmd:
                 if not IbotFlag:
                     IbotFlag = True
+                    InteractiveBot = interabot.interabot.Bot()
                     await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
                     await log.Log('Interactive bot mode is ON')
                     await client.change_presence(game=discord.Game(name='IBOT'))
@@ -692,6 +698,7 @@ async def on_message(message):
             elif '--stop' in cmd:
                 if IbotFlag:
                     IbotFlag = False
+                    InteractiveBot = None
                     await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
                     await log.Log('Interactive bot mode is OFF')
                     await client.change_presence(game=(None if not PlayFlag else discord.Game(name='IBOMusicPlayerT')))
@@ -706,8 +713,7 @@ async def on_message(message):
         await client.send_message(message.channel, '該当するコマンドがありません')
         await log.ErrorLog('Command is notfind')
     elif IbotFlag and not message.author.bot:
-        bot = interabot.interabot.Bot()
-        comment = bot.Response(message.content)
+        comment = InteractiveBot.Response(message.content)
         if not comment is None:
             await client.send_message(message.channel, comment)
             await log.Log('ibot return {}'.format(comment))
