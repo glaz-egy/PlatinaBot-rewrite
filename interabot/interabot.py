@@ -6,7 +6,7 @@ import os
 
 GreetingDict = {'mooning': [4, 5, 6, 7, 8, 9],
                 'noon': [10, 11, 12, 13, 14, 15, 16, 17, 18],
-                'night': [19, 21, 22, 23, 24, 0, 1, 2, 3]}
+                'night': [19, 20, 21, 22, 23, 24, 0, 1, 2, 3]}
 TimeZone = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
 class Bot:
