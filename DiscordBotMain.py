@@ -683,7 +683,7 @@ async def on_message(message):
         await client.send_message(message.channel, out)
         await log.Log('Bot say {}'.format(out))
     elif message.content.startswith(prefix+'ibot'):
-        cmd = message.content.split()[1:]
+        cmd = message.content.split()
         if TrueORFalse[config['BOTMODE']['ibot_mode']]:
             if '--start' in cmd:
                 if not IbotFlag:
