@@ -14,7 +14,6 @@ import time
 import sys
 import os
 
-
 class LogControl:
     def __init__(self, FileName):
         self.Name = FileName
@@ -93,10 +92,8 @@ class MusicPlayer:
 
     async def play(self, message, *, song : str):
         state = self.get_voice_state(message.server)
-        opts = {
-            'default_search': 'auto',
-            'quiet': True,
-        }
+        opts = {'default_search': 'auto',
+                'quiet': True,}
 
         if state.voice is None:
             voice_channel = message.author.voice_channel
@@ -162,15 +159,13 @@ PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TittleFlag = True
-version = 'version: 2.3.0'
+version = 'version: 2.3.1'
 log = LogControl('bot.log')
 config = ConfigParser()
-if os.path.isfile('config.ini'):
-    config.read('config.ini', encoding='utf-8')
+if os.path.isfile('config.ini'): config.read('config.ini', encoding='utf-8')
 else:
     log.ErrorLog('Config file not exist')
     sys.exit(1)
-token = config['BOTDATA']['token']
 prefix = config['BOTDATA']['cmdprefix']
 if len(PlayListFiles) == 0:
     PLFList = glob('*.plf')
@@ -252,10 +247,8 @@ async def ListOut(message, all=False):
             URLs.append('')
             keys.append(key)
             if key == NowPlayList: keys[-1] += '(Now playlist)'
-            for url in value:
-                URLs[-1] += ' '+url+'\n'
-            if URLs[-1] == '':
-                URLs[-1] = 'Empty'
+            for url in value: URLs[-1] += ' '+url+'\n'
+            if URLs[-1] == '': URLs[-1] = 'Empty'
         embed = discord.Embed(description='全てのプレイリスト', colour=0x6b8e23)
         for i in range(len(keys)):
             embed.add_field(name=keys[i], value=URLs[i], inline=True)
@@ -263,8 +256,7 @@ async def ListOut(message, all=False):
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
         URLs = ''
-        for url in PlayListFiles[NowPlayList]:
-            URLs += ' '+url+'\n'
+        for url in PlayListFiles[NowPlayList]: URLs += ' '+url+'\n'
         embed = discord.Embed(description='Now playlist', colour=0x708090)
         embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs if URLs != '' else 'Empty', inline=True)
         await client.send_message(message.channel, embed=embed)
@@ -277,8 +269,7 @@ async def CmdSpliter(cmd, index):
     if '"' in cmd[index]:
         tempStr = cmd[index] + ' ' + cmd[index+1]
         SplitStr = tempStr.replace('"', '')
-    else:
-        SplitStr = cmd[index]
+    else: SplitStr = cmd[index]
     return SplitStr
 
 async def OptionError(message, cmd):
@@ -324,8 +315,7 @@ async def on_message(message):
             AdminRoles = ''
             NomalRoles = ''
             for Role in RoleList:
-                if '@everyone' == Role.name:
-                    pass
+                if '@everyone' == Role.name: pass
                 elif Role.permissions.administrator:
                     RoleName = Role.name + '(変更不可)' if Role.name in UnmodifiableRole else Role.name
                     AdminRoles += RoleName+'\n'
@@ -390,9 +380,6 @@ async def on_message(message):
             CmdFlag = True
             RemoveFlag = True
             RoleName = await CmdSpliter(cmd, cmd.index('--remove')+1)
-        if not CmdFlag:
-            await OptionError(message, cmd)
-            return
         if (CreateFlag or RemoveFlag) and (AddFlag or DelFlag):
             await client.send_message(message.channel, 'そのコマンドは両立出来ないなぁ')
             await log.ErrorLog('A command for the server and a command for the member are entered error')
@@ -479,6 +466,7 @@ async def on_message(message):
             else:
                 await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
+        if not CmdFlag: await OptionError(message, cmd)
     elif message.content.startswith(prefix+'music'):
         urlUseFlag = False
         cmdFlag = False
@@ -549,8 +537,7 @@ async def on_message(message):
             RandomFlag = False
             TittleFlag = True
             if '-r' in cmd: RandomFlag = True
-            if PauseFlag:
-                await player.resume(message)
+            if PauseFlag: await player.resume(message)
             else:
                 if not len(PlayURLs) == 0: music = randint(0, len(PlayURLs)-1)
                 else: music = 0
@@ -598,8 +585,7 @@ async def on_message(message):
             await player.pause(message)
             PauseFlag = True
             cmdFlag = True
-        if not cmdFlag:
-            await OptionError(message, cmd)
+        if not cmdFlag: await OptionError(message, cmd)
     elif message.content.startswith(prefix+'addmusic'):
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
@@ -619,8 +605,7 @@ async def on_message(message):
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-    elif message.content.startswith(prefix+'musiclist'):
-        await ListOut(message)
+    elif message.content.startswith(prefix+'musiclist'): await ListOut(message)
     elif message.content.startswith('!delmusic'):
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
@@ -676,8 +661,7 @@ async def on_message(message):
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
-            PassWord = message.content.split()[1]
-            HashWord = hashlib.sha256(PassWord.encode('utf-8')).hexdigest()
+            HashWord = hashlib.sha256(message.content.split()[1].encode('utf-8')).hexdigest()
             AdminCheck = (HashWord == config['ADMINDATA']['passhash'] if config['ADMINDATA']['passhash'] != 'None' else False)
         if AdminCheck:
             await log.Log('Bot exit')
@@ -690,9 +674,9 @@ async def on_message(message):
     elif message.content.startswith(prefix+'say'):
         cmds = message.content.split()[1:]
         out = ''
-        for cmd in cmds:
-            out += cmd+' '
+        for cmd in cmds: out += cmd+' '
         await client.send_message(message.channel, out)
+        await log.Log('Bot say {}'.format(out))
     elif message.content.startswith(prefix+'ibot'):
         cmd = message.content.split()[1:]
         if TrueORFalse[config['BOTMODE']['ibot_mode']]:
@@ -714,8 +698,7 @@ async def on_message(message):
                 else:
                     await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
                     await log.ErrorLog('Already interractive bot mode is OFF')
-            else:
-                await OptionError(message, cmd)
+            else: await OptionError(message, cmd)
         else:
             await client.send_message(message.channel, '現在このコマンドは無効化されています')
             await log.ErrorLog('Ibot mode is Disable')
@@ -728,7 +711,6 @@ async def on_message(message):
         if not comment is None:
             await client.send_message(message.channel, comment)
             await log.Log('ibot return {}'.format(comment))
-        
 
 @client.event
 async def on_member_join(member):
@@ -738,8 +720,7 @@ async def on_member_join(member):
         text = jointexts[randint(0, len(jointexts)-1)].strip()
         channel = client.get_channel(config['BOTDATA']['mainch'])
         readme = client.get_channel(config['BOTDATA']['readmech'])
-        if channel is None or readme is None:
-            return
+        if channel is None or readme is None: return
         text = text.replace('[MenberName]', member.name)
         text = text.replace('[ChannelName]', readme.name)
         await client.send_message(channel, text)
@@ -747,4 +728,4 @@ async def on_member_join(member):
     print('Join {}'.format(member.name))
 
 
-client.run(token)
+client.run(config['BOTDATA']['token'])
