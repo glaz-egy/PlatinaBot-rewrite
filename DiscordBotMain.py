@@ -561,6 +561,7 @@ async def on_message(message):
                     if not urlUseFlag: PlayURLs.remove(PlayURLs[music if RandomFlag else 0])
                     if len(PlayURLs) == 0: PlayURLs = deepcopy(PlayListFiles[NowPlayList])
                     PlayFlag = True
+                    await client.change_presence(game=discord.Game(name='MusicPlayer'))
                 except discord.errors.InvalidArgument:
                     pass
                 except discord.ClientException:
@@ -585,6 +586,7 @@ async def on_message(message):
                 await client.send_message(message.channel, '今、プレイヤーは再生してないよ！')
                 await log.ErrorLog('Not play music')
                 return
+            await client.change_presence(game=None)
             await log.MusicLog('Music stop')
             await player.stop(message)
             PlayFlag = False
@@ -721,7 +723,7 @@ async def on_message(message):
     elif message.content.startswith(prefix):
         await client.send_message(message.channel, '該当するコマンドがありません')
         await log.ErrorLog('Command is notfind')
-    elif IbotFlag and not message.author.bot and 'はいどろ' in message.content:
+    elif IbotFlag and not message.author.bot:
         bot = interabot.interabot.Bot()
         comment = bot.Response(message.content)
         if not comment is None:

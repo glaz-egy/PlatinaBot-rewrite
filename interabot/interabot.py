@@ -17,7 +17,18 @@ class Bot:
         if '今何時' in text:
             now = datetime.datetime.now(TimeZone)
             comment = '{}:{:02}だよ！'.format(now.hour, now.minute)
-        elif '' in text:
+        elif 'おはよう' in text:
             now = datetime.datetime.now(TimeZone)
-
+            if not now.hour in GreetingDict['mooning']:
+                comment = 'おはようじゃないよ！　今、{}時だよ'.format(now.hour)
+            else:
+                comment = 'おはよう！'
+        elif 'こんばん' in text:
+            now = datetime.datetime.now(TimeZone)
+            if not now.hour in GreetingDict['night']:
+                comment = 'こんばんわじゃないよ！　今、{}時だよ'.format(now.hour)
+            else:
+                comment = 'こんばんわ！'
+        elif 'こんにち' in text:
+            comment = 'こんにちは！'
         return comment
