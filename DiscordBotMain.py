@@ -3,6 +3,7 @@
 from configparser import ConfigParser
 from collections import OrderedDict
 from random import random, randint
+from youtube_dl import YoutubeDL
 from datetime import datetime
 from copy import deepcopy
 from glob import glob
@@ -238,30 +239,57 @@ async def NextSet(message):
     if len(PlayURLs) == 0:
         PlayURLs = deepcopy(PlayListFiles[NowPlayList])
 
-async def ListOut(message, all=False):
+async def ListOut(message, all=False, List=False):
     global NowPlayList
+    OutFlag = False
     if all:
         await log.Log('Play list check all')
-        URLs = []
+        URLs = [[]]
         keys = []
         for key, value in PlayListFiles.items():
-            URLs.append('')
+            OutFlag = False
+            URLs[-1].append('')
             keys.append(key)
             if key == NowPlayList: keys[-1] += '(Now playlist)'
-            for url in value: URLs[-1] += ' '+url+'\n'
-            if URLs[-1] == '': URLs[-1] = 'Empty'
-        embed = discord.Embed(description='全てのプレイリスト', colour=0x6b8e23)
-        for i in range(len(keys)):
-            embed.add_field(name=keys[i], value=URLs[i], inline=True)
-        await client.send_message(message.channel, embed=embed)
+            for url in value:
+                title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
+                url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
+                URLs[-1][-1] += '-'+title+'\n'+url+'\n'
+                if len(URLs[-1][-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1])
+                    URLs[-1].append('')
+            if not OutFlag or URLs[-1][-1] != '':
+                await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1])
+    elif List:
+        Keys = ['']
+        for key in PlayListFiles.keys():
+            Keys[-1] += key+'\n'
+            if len(Keys[-1]) > 750:
+                OutFlag = True
+                await EmbedOut(message.channel, 'Playlist List: page{}'.format(lne(Keys)), None, Keys[-1])
+                Keys.append('')
+        if not OutFlag or Keys[-1] != '':
+            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), None, Keys[-1])
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
-        URLs = ''
-        for url in PlayListFiles[NowPlayList]: URLs += ' '+url+'\n'
-        embed = discord.Embed(description='Now playlist', colour=0x708090)
-        embed.add_field(name='プレイリスト名: '+NowPlayList, value=URLs if URLs != '' else 'Empty', inline=True)
-        await client.send_message(message.channel, embed=embed)
-            
+        URLs = ['']
+        for url in PlayListFiles[NowPlayList]:
+            title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
+            url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
+            URLs[-1] += '-'+title+'\n'+url+'\n'
+            if len(URLs[-1]) > 750:
+                OutFlag = True
+                await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1])
+                URLs.append('')
+        if not OutFlag or URLs[-1] != '':
+            await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1])
+
+async def EmbedOut(channel, disc, playname, url):
+    embed = discord.Embed(description=disc, colour=0x708090)
+    embed.add_field(name=playname, value=url if url != '' else 'Empty', inline=True)
+    await client.send_message(channel, embed=embed)
+
 async def PermissionErrorFunc(message):
     await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
     await log.ErrorLog('Do not have permissions')
@@ -478,6 +506,9 @@ async def on_message(message):
             return
         if '--list-all' in cmd:
             await ListOut(message, all=True)
+            return
+        if '--list-list' in cmd:
+            await ListOut(message, List=True)
             return
         if '--list-change' in cmd:
             temp = NowPlayList
