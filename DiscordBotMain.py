@@ -257,20 +257,20 @@ async def ListOut(message, all=False, List=False):
                 URLs[-1][-1] += '-'+title+'\n'+url+'\n'
                 if len(URLs[-1][-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1])
+                    await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
                     URLs[-1].append('')
             if not OutFlag or URLs[-1][-1] != '':
-                await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1])
+                await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
     elif List:
         Keys = ['']
         for key in PlayListFiles.keys():
             Keys[-1] += key+'\n'
             if len(Keys[-1]) > 750:
                 OutFlag = True
-                await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1])
+                await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
                 Keys.append('')
         if not OutFlag or Keys[-1] != '':
-            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1])
+            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
         URLs = ['']
@@ -280,12 +280,12 @@ async def ListOut(message, all=False, List=False):
             URLs[-1] += '-'+title+'\n'+url+'\n'
             if len(URLs[-1]) > 750:
                 OutFlag = True
-                await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1])
+                await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
                 URLs.append('')
         if not OutFlag or URLs[-1] != '':
-            await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1])
+            await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
 
-async def EmbedOut(channel, disc, playname, url):
+async def EmbedOut(channel, disc, playname, url, color):
     embed = discord.Embed(description=disc, colour=0x708090)
     embed.add_field(name=playname, value=url if url != '' else 'Empty', inline=True)
     await client.send_message(channel, embed=embed)
