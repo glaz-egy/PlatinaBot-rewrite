@@ -286,7 +286,7 @@ async def ListOut(message, all=False, List=False):
             await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
 
 async def EmbedOut(channel, disc, playname, url, color):
-    embed = discord.Embed(description=disc, colour=0x708090)
+    embed = discord.Embed(description=disc, colour=color)
     embed.add_field(name=playname, value=url if url != '' else 'Empty', inline=True)
     await client.send_message(channel, embed=embed)
 
