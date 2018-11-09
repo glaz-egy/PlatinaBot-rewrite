@@ -267,10 +267,10 @@ async def ListOut(message, all=False, List=False):
             Keys[-1] += key+'\n'
             if len(Keys[-1]) > 750:
                 OutFlag = True
-                await EmbedOut(message.channel, 'Playlist List: page{}'.format(lne(Keys)), None, Keys[-1])
+                await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), '', Keys[-1])
                 Keys.append('')
         if not OutFlag or Keys[-1] != '':
-            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), None, Keys[-1])
+            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), '', Keys[-1])
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
         URLs = ['']
