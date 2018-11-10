@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 
 from configparser import ConfigParser
+from datetime import datetime, date
 from collections import OrderedDict
 from random import random, randint
 from youtube_dl import YoutubeDL
-from datetime import datetime
 from copy import deepcopy
 from glob import glob
+import threading
 import interabot
 import discord
 import hashlib
 import asyncio
+import pickle
+import signal
 import time
 import sys
 import os
@@ -40,6 +43,29 @@ class VoiceEntry:
     def __str__(self):
         fmt = '{} uploaded by {}: `{}`'.format(self.player.title, self.player.uploader, self.player.url)
         return fmt
+
+class Calendar:
+    def __init__(self, bot):
+        self.CalData = {}
+        self.bot = bot
+        #self.bot.loop.create_task(self.CalTask())
+        #self.bot.loop.call_soon(self.CalTask)
+
+    async def CalTask(self):
+        while True:
+            print('test')
+            today = str(date.today())
+            if today in self.CalData.keys():
+                embed = discord.Embed(description=today, colour=0x000000)
+                embed.add_field(name=self.CalData[today][0], value=self.CalData[today][1], inline=True)
+                await self.bot.send_message(self.CalData[today][2], embed=embed)
+                if self.CalData[today][3]:
+                    pass
+                else:
+                    del self.CalData[today]
+
+    def CalRegister(self, eventDay, eventName, eventContent, outChannel, Loop=False):
+        self.CalData[eventDay] = [eventName, eventContent, outChannel, Loop]
 
 class VoiceState:
     def __init__(self, bot):
@@ -74,7 +100,7 @@ class VoiceState:
             self.play_next_song.clear()
             self.current = await self.songs.get()
             await NextSet(MusicMessage)
-            if TittleFlag: await self.bot.send_message(self.current.channel, 'Now playing **{}**'.format(self.current))
+            if TitleFlag: await self.bot.send_message(self.current.channel, 'Now playing **{}**'.format(self.current))
             self.current.player.start()
             await self.play_next_song.wait()
 
@@ -150,6 +176,21 @@ class MusicPlayer:
 
         state.skip()
 
+def SavePlaylist(PLdata, FileName='playlist.plf'):
+    PLdataRaw = {}
+    for key, val in PLdata.items():
+        PLdataRaw[key] = val
+    with open(FileName, 'wb') as f:
+        pickle.dump(PLdataRaw, f)
+
+def LoadPlaylist(FileName='playlist.plf'):
+    with open(FileName, 'rb') as f:
+        PLdataRaw = pickle.load(f)
+    PLdata = {}
+    for key, val in PLdataRaw.items():
+        PLdata[key] = val
+    return PLdata
+
 MusicMessage = None
 player = None
 InteractiveBot = None
@@ -160,7 +201,7 @@ RandomFlag = False
 PauseFlag = False
 PlayFlag = False
 IbotFlag = False
-TittleFlag = True
+TitleFlag = True
 version = 'PlatinaBot version: 2.3.1'
 log = LogControl('bot.log')
 config = ConfigParser()
@@ -169,6 +210,7 @@ else:
     log.ErrorLog('Config file not exist')
     sys.exit(1)
 prefix = config['BOTDATA']['cmdprefix']
+"""
 if len(PlayListFiles) == 0:
     PLFList = glob('*.plf')
     for PLF in PLFList:
@@ -179,10 +221,20 @@ if len(PlayListFiles) == 0:
         for play in temp:
             if not play == '':
                 PlayListFiles[PlayListName[-1]].append(play.replace('\n', ''))
+"""
+if os.path.isfile('playlist.plf'): PlayListFiles = LoadPlaylist()
+else:
+    PlayListFiles['default'] = {}
+    SavePlaylist(PlayListFiles)
+    PlayListFiles = LoadPlaylist()
 NowPlayList = 'default'
-PlayURLs = deepcopy(PlayListFiles['default'])
+PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
 client = discord.Client()
+
+Cal = Calendar(client)
+#signal.signal(signal.SIGALRM, Cal.CalTask)
+#signal.setitimer(signal.ITIMER_REAL, 0.1, 0.1)
 
 CommandDict = OrderedDict()
 CommandDict = {'`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
@@ -237,7 +289,7 @@ async def NextSet(message):
     await log.MusicLog('Set {}'.format(PlayURLs[NowPlay]))
     PlayURLs.remove(PlayURLs[NowPlay])
     if len(PlayURLs) == 0:
-        PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+        PlayURLs = list(PlayListFiles[NowPlayList].keys())
 
 async def ListOut(message, all=False, List=False):
     global NowPlayList
@@ -251,14 +303,15 @@ async def ListOut(message, all=False, List=False):
             URLs[-1].append('')
             keys.append(key)
             if key == NowPlayList: keys[-1] += '(Now playlist)'
-            for url in value:
-                title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
-                url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
-                URLs[-1][-1] += '-'+title+'\n'+url+'\n'
-                if len(URLs[-1][-1]) > 750:
-                    OutFlag = True
-                    await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
-                    URLs[-1].append('')
+            if not len(value) == 0:
+                for url, title in value.items():
+                    if title is None: title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
+                    url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
+                    URLs[-1][-1] += '-'+title+'\n'+url+'\n'
+                    if len(URLs[-1][-1]) > 750:
+                        OutFlag = True
+                        await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
+                        URLs[-1].append('')
             if not OutFlag or URLs[-1][-1] != '':
                 await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
     elif List:
@@ -274,14 +327,15 @@ async def ListOut(message, all=False, List=False):
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
         URLs = ['']
-        for url in PlayListFiles[NowPlayList]:
-            title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
-            url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
-            URLs[-1] += '-'+title+'\n'+url+'\n'
-            if len(URLs[-1]) > 750:
-                OutFlag = True
-                await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
-                URLs.append('')
+        if not len(PlayListFiles[NowPlayList]) == 0:
+            for url, title in PlayListFiles[NowPlayList].items():
+                if title is None: title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
+                url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
+                URLs[-1] += '-'+title+'\n'+url+'\n'
+                if len(URLs[-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
+                    URLs.append('')
         if not OutFlag or URLs[-1] != '':
             await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
 
@@ -324,7 +378,7 @@ async def on_message(message):
     global PauseFlag
     global PlayFlag
     global IbotFlag
-    global TittleFlag
+    global TitleFlag
     if message.content.startswith(prefix+'role'):
         AddFlag = False
         DelFlag = False
@@ -517,7 +571,7 @@ async def on_message(message):
             except:
                 NowPlayList = 'default'
             try:
-                PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+                PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, 'プレイリストが{}から{}へ変更されました'.format(temp, NowPlayList))
                 await log.MusicLog('Play list change {} to {}'.format(temp, NowPlayList))
             except:
@@ -536,10 +590,9 @@ async def on_message(message):
                 await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
                 await log.ErrorLog('Make request exist play list')
             else:
-                with open(PlayListName+'.plf', 'w') as f:
-                    pass
+                PlayListFiles[PlayListName] = {}
+                SavePlaylist(PlayListFiles)
                 NowPlayList = PlayListName
-                PlayListFiles[NowPlayList] = []
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
                 await log.MusicLog('Make play list {}'.format(PlayListName))
             return
@@ -568,18 +621,22 @@ async def on_message(message):
         MusicMessage = message
         if '--play' in cmd:
             RandomFlag = False
-            TittleFlag = True
+            TitleFlag = True
             if '-r' in cmd: RandomFlag = True
             if PauseFlag: await player.resume(message)
             else:
-                if not len(PlayURLs) == 0: music = randint(0, len(PlayURLs)-1)
-                else: music = 0
+                if not len(PlayURLs) == 1: music = randint(0, len(PlayURLs)-1)
+                elif not len(PlayURLs) == 0: music = 0
+                else:
+                    await client.send_message(message.channle, 'プレイリストに曲が入ってないよ！')
+                    await log.ErrorLog('Not music in playlist')
+                    return
                 try:
                     player = MusicPlayer(client)
                     song = PlayURLs[music if RandomFlag else 0] if not urlUseFlag else url
                     await player.play(message, song=('https://www.youtube.com/watch?v='+ song if not 'http' in song else song))
                     if not urlUseFlag: PlayURLs.remove(PlayURLs[music if RandomFlag else 0])
-                    if len(PlayURLs) == 0: PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+                    if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
                     PlayFlag = True
                     await client.change_presence(game=discord.Game(name='MusicPlayer'))
                 except discord.errors.InvalidArgument:
@@ -595,7 +652,7 @@ async def on_message(message):
             RandomFlag = False
             cmdFlag = True
         if '--no-out' in cmd:
-            TittleFlag = False
+            TitleFlag = False
             cmdFlag = True
         if '--next' in cmd:
             await log.MusicLog('Music skip')
@@ -611,7 +668,7 @@ async def on_message(message):
             await player.stop(message)
             PlayFlag = False
             player = None
-            PlayURLs = deepcopy(PlayListFiles[NowPlayList])
+            PlayURLs = list(PlayListFiles[NowPlayList].keys())
             cmdFlag = True
         if '--pause' in cmd:
             await log.MusicLog('Music pause')
@@ -625,21 +682,25 @@ async def on_message(message):
             ListName = links[0]
             links.remove(links[0])
         else: ListName = NowPlayList
+        ineed = ['']
         for link in links:
             link = link.replace('https://www.youtube.com/watch?v=', '')
             link = link.replace('https://youtu.be/', '')
             if not link in PlayListFiles[ListName]:
-                PlayListFiles[ListName].append(link)
+                PlayListFiles[ListName][link] = YoutubeDL().extract_info(url=link, download=False, process=False)['title']
                 PlayURLs.append(link)
                 await log.MusicLog('Add {}'.format(link))
-                await client.send_message(message.channel, '`{}` が欲しかった！'.format('https://www.youtube.com/watch?v='+link))
-                with open(ListName+'.plf', 'a') as f:
-                    f.write('{}\n'.format(link))
+                ineed[-1] += '-{} が欲しかった！\n'.format(PlayListFiles[ListName][link])
+                if len(ineed[-1]) > 750:
+                    await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
+                    ineed.append('')
+                SavePlaylist(PlayListFiles)
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
+        if not ineed[-1] == '': await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x000000)
     elif message.content.startswith(prefix+'musiclist'): await ListOut(message)
-    elif message.content.startswith('!delmusic'):
+    elif message.content.startswith(prefix+'delmusic'):
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
             ListName = links[0]
@@ -650,19 +711,18 @@ async def on_message(message):
             link = link.replace('youtube.com/watch?v=', '')
             link = link.replace('https://youtu.be/', '')
             try:
-                PlayListFiles[ListName].remove(link)
+                del PlayListFiles[ListName][link]
                 try:
                     PlayURLs.remove(link)
                 except:
                     pass
                 await log.MusicLog('Del {}'.format(link))
                 await client.send_message(message.channel, '`{}` なんてもういらないよね！'.format('https://www.youtube.com/watch?v='+link))
-                with open(ListName+'.plf', 'w') as f:
-                    for URL in PlayListFiles[ListName]:
-                        f.write('{}\n'.format(URL))
+                SavePlaylist(PlayListFiles)
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
+        if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
         if len(cmds) > 1:
@@ -713,6 +773,16 @@ async def on_message(message):
         for cmd in cmds: out += cmd+' '
         await client.send_message(message.channel, out)
         await log.Log('Bot say {}'.format(out))
+    elif message.content.startswith(prefix+'cal'):
+        cmd = message.content.split()
+        if '--add' in cmd:
+            EventDay = cmd[cmd.index('--add')+1]
+            EventName = cmd[cmd.index('--add')+2]
+            EventContent = cmd[cmd.index('--add')+3]
+            Cal.CalRegister(EventDay, EventName, EventContent, message.channel)
+        if '--print' in cmd:
+            await client.send_message(message.channel, str(Cal.CalData))
+            await Cal.CalTask()
     elif message.content.startswith(prefix+'ibot'):
         cmd = message.content.split()
         if TrueORFalse[config['BOTMODE']['ibot_mode']]:
@@ -763,6 +833,5 @@ async def on_member_join(member):
         await client.send_message(channel, text)
     await log.Log('Join {}'.format(member.name))
     print('Join {}'.format(member.name))
-
 
 client.run(config['BOTDATA']['token'])
