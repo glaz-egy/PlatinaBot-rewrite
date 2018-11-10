@@ -317,7 +317,8 @@ async def ListOut(message, all=False, List=False):
     elif List:
         Keys = ['']
         for key in PlayListFiles.keys():
-            Keys[-1] += key+'\n'
+            if key == NowPlayList: Keys[-1] += key+'(Now playlist)\n'
+            else: Keys[-1] += key+'\n'
             if len(Keys[-1]) > 750:
                 OutFlag = True
                 await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
@@ -613,6 +614,24 @@ async def on_message(message):
                 await client.send_message(message.channel, 'そのプレイリストは存在しません')
                 await log.ErrorLog('Remove request not exist play list')
             return
+        if '--list-clear' in cmd:
+            if len(cmd) > 2:
+                ClearPlaylist = cmd[cmd.index('--list-clear')+1]
+                PlayListFiles[ClearPlaylist] = {}
+                await client.send_message(message.channel, '{}をクリアしました'.format(ClearPlaylist))
+                await log.MusicLog('Cleared {}'.format(ClearPlaylist))
+                SavePlaylist(PlayListFiles)
+            else:
+                await client.send_message(message.channel, 'プレイリスト名を入力してください')
+                await log.ErrorLog('Need Playlist name')
+            return
+        if '--list-clear-all' in cmd:
+            for key in PlayListFiles.keys():
+                PlayListFiles[key] = {}
+                await client.send_message(message.channel, '{}をクリアしました'.format(key))
+                await log.MusicLog('Cleared {}'.format(key))
+            SavePlaylist(PlayListFiles)
+            return
         if len(cmd) >= 2:
             for cmdpar in cmd:
                 if '$' in cmdpar:
@@ -677,6 +696,7 @@ async def on_message(message):
             cmdFlag = True
         if not cmdFlag: await OptionError(message, cmd)
     elif message.content.startswith(prefix+'addmusic'):
+        NotFound = True
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
             ListName = links[0]
@@ -684,21 +704,28 @@ async def on_message(message):
         else: ListName = NowPlayList
         ineed = ['']
         for link in links:
+            linkraw = deepcopy(link)
             link = link.replace('https://www.youtube.com/watch?v=', '')
             link = link.replace('https://youtu.be/', '')
             if not link in PlayListFiles[ListName]:
-                PlayListFiles[ListName][link] = YoutubeDL().extract_info(url=link, download=False, process=False)['title']
-                PlayURLs.append(link)
-                await log.MusicLog('Add {}'.format(link))
-                ineed[-1] += '-{} が欲しかった！\n'.format(PlayListFiles[ListName][link])
-                if len(ineed[-1]) > 750:
-                    await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
-                    ineed.append('')
-                SavePlaylist(PlayListFiles)
+                try:
+                    PlayListFiles[ListName][link] = YoutubeDL().extract_info(url=link, download=False, process=False)['title']
+                    PlayURLs.append(link)
+                    await log.MusicLog('Add {}'.format(link))
+                    ineed[-1] += '-{} が欲しかった！\n'.format(PlayListFiles[ListName][link])
+                    NotFound = False
+                    if len(ineed[-1]) > 750:
+                        await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
+                        ineed.append('')
+                        NotFound = True
+                    SavePlaylist(PlayListFiles)
+                except:
+                    await client.send_message(message.channel, '{} なんて無いよ'.format(linkraw))
+                    await log.ErrorLog('{} is Not Found'.format(linkraw))
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-        if not ineed[-1] == '': await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x000000)
+        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'musiclist'): await ListOut(message)
     elif message.content.startswith(prefix+'delmusic'):
         links = message.content.split()[1:]
