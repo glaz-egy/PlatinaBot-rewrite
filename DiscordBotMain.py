@@ -712,7 +712,7 @@ async def on_message(message):
                     PlayListFiles[ListName][link] = YoutubeDL().extract_info(url=link, download=False, process=False)['title']
                     PlayURLs.append(link)
                     await log.MusicLog('Add {}'.format(link))
-                    ineed[-1] += '-{} が欲しかった！\n'.format(PlayListFiles[ListName][link])
+                    ineed[-1] += '-{}\n'.format(PlayListFiles[ListName][link])
                     NotFound = False
                     if len(ineed[-1]) > 750:
                         await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
