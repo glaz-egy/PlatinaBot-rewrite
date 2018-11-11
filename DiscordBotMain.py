@@ -14,6 +14,8 @@ import hashlib
 import asyncio
 import pickle
 import signal
+import syncer
+import sched
 import time
 import sys
 import os
@@ -48,21 +50,14 @@ class Calendar:
     def __init__(self, bot):
         self.CalData = {}
         self.bot = bot
-        #self.bot.loop.create_task(self.CalTask())
-        #self.bot.loop.call_soon(self.CalTask)
 
-    async def CalTask(self):
-        while True:
-            print('test')
-            today = str(date.today())
-            if today in self.CalData.keys():
-                embed = discord.Embed(description=today, colour=0x000000)
-                embed.add_field(name=self.CalData[today][0], value=self.CalData[today][1], inline=True)
-                await self.bot.send_message(self.CalData[today][2], embed=embed)
-                if self.CalData[today][3]:
-                    pass
-                else:
-                    del self.CalData[today]
+    def CalTask(self):
+        print('test')
+        self.CalData['2018-11-10'] = ['test', 'korehatesoto', self.bot.get_channel('508137939491094557'), False]
+        today = str(date.today())
+        embed = discord.Embed(description='2018-11-10', colour=0x000000)
+        embed.add_field(name=self.CalData['2018-11-10'][0], value=self.CalData['2018-11-10'][1], inline=True)
+        syncer.sync(self.bot.send_message(self.bot.get_channel('508137939491094557'), embed=embed))
 
     def CalRegister(self, eventDay, eventName, eventContent, outChannel, Loop=False):
         self.CalData[eventDay] = [eventName, eventContent, outChannel, Loop]
@@ -202,7 +197,7 @@ PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TitleFlag = True
-version = 'PlatinaBot version: 2.3.1'
+version = 'PlatinaBot version: 2.3.3'
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'): config.read('config.ini', encoding='utf-8')
@@ -210,18 +205,7 @@ else:
     log.ErrorLog('Config file not exist')
     sys.exit(1)
 prefix = config['BOTDATA']['cmdprefix']
-"""
-if len(PlayListFiles) == 0:
-    PLFList = glob('*.plf')
-    for PLF in PLFList:
-        PlayListName.append(PLF.replace('.plf', ''))
-        PlayListFiles[PlayListName[-1]] = []
-        with open(PLF, 'r') as f:
-            temp = f.readlines()
-        for play in temp:
-            if not play == '':
-                PlayListFiles[PlayListName[-1]].append(play.replace('\n', ''))
-"""
+
 if os.path.isfile('playlist.plf'): PlayListFiles = LoadPlaylist()
 else:
     PlayListFiles['default'] = {}
@@ -233,8 +217,6 @@ UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
 client = discord.Client()
 
 Cal = Calendar(client)
-#signal.signal(signal.SIGALRM, Cal.CalTask)
-#signal.setitimer(signal.ITIMER_REAL, 0.1, 0.1)
 
 CommandDict = OrderedDict()
 CommandDict = {'`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
@@ -594,6 +576,7 @@ async def on_message(message):
                 PlayListFiles[PlayListName] = {}
                 SavePlaylist(PlayListFiles)
                 NowPlayList = PlayListName
+                PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
                 await log.MusicLog('Make play list {}'.format(PlayListName))
             return
@@ -606,7 +589,7 @@ async def on_message(message):
                 return
             if PlayListName in PlayListFiles.keys() and not 'default' == PlayListName:
                 del PlayListFiles[PlayListName]
-                os.remove(PlayListName+'.plf')
+                SavePlaylist(PlayListFiles)
                 await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
                 await log.MusicLog('Remove play list {}'.format(PlayListName))
                 NowPlayList = 'default'
@@ -808,8 +791,8 @@ async def on_message(message):
             EventContent = cmd[cmd.index('--add')+3]
             Cal.CalRegister(EventDay, EventName, EventContent, message.channel)
         if '--print' in cmd:
-            await client.send_message(message.channel, str(Cal.CalData))
             await Cal.CalTask()
+            await client.send_message(message.channel, str(Cal.CalData))
     elif message.content.startswith(prefix+'ibot'):
         cmd = message.content.split()
         if TrueORFalse[config['BOTMODE']['ibot_mode']]:
