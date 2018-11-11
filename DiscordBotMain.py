@@ -53,7 +53,7 @@ class Calendar:
     async def CalTask(self):
         print('test')
         self.CalData['2018-11-10'] = ['test', 'korehatesoto', self.bot.get_channel('508137939491094557'), False]
-        today = str(date.today())
+        _ = str(date.today())
         embed = discord.Embed(description='2018-11-10', colour=0x000000)
         embed.add_field(name=self.CalData['2018-11-10'][0], value=self.CalData['2018-11-10'][1], inline=True)
         await self.bot.send_message(self.bot.get_channel('508137939491094557'), embed=embed)
@@ -171,18 +171,12 @@ class MusicPlayer:
         state.skip()
 
 def SavePlaylist(PLdata, FileName='playlist.plf'):
-    PLdataRaw = {}
-    for key, val in PLdata.items():
-        PLdataRaw[key] = val
     with open(FileName, 'wb') as f:
-        pickle.dump(PLdataRaw, f)
+        pickle.dump(PLdata, f)
 
 def LoadPlaylist(FileName='playlist.plf'):
     with open(FileName, 'rb') as f:
-        PLdataRaw = pickle.load(f)
-    PLdata = {}
-    for key, val in PLdataRaw.items():
-        PLdata[key] = val
+        PLdata = pickle.load(f)
     return PLdata
 
 MusicMessage = None
@@ -205,7 +199,9 @@ else:
     log.ErrorLog('Config file not exist')
     sys.exit(1)
 prefix = config['BOTDATA']['cmdprefix']
-
+with open('help.dat', 'rb') as f:
+    Data = pickle.load(f)
+    CommandDict = Data['JP']
 if os.path.isfile('playlist.plf'): PlayListFiles = LoadPlaylist()
 else:
     PlayListFiles['default'] = {}
@@ -218,44 +214,6 @@ maindir = os.getcwd()
 
 client = discord.Client()
 Cal = Calendar(client)
-
-CommandDict = OrderedDict()
-CommandDict = {'`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
-                '`'+prefix+'play`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
-                '`'+prefix+'say SayText`': 'ボットがSayTextの内容を発言します それだけのコマンド',
-                '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします ボットの認識子はいまのところ「はいどろ」 また、現在は「今何時」にのみ対応',
-                '`'+prefix+'version`': '現在のバージョンを確認できる',
-                '`'+prefix+'help`' : '今見てるのに説明いる？　ヘルプ用なんだけど',
-                '`'+prefix+'exit [ExitPassword]`': 'ボット管理者かExitPasswordを知っている人のみボットを停止できます',
-                '隠し機能': '隠し機能が有るから探してみてね'}
-
-PlayCmdDict = OrderedDict()
-PlayCmdDict = {'`'+prefix+'music option`': '音楽を再生します　`-r`を付けるとランダム再生 `$[url]`でurlを優先再生 `--list`でプレイリストを確認',
-                '`-r`': 'ランダム再生を有効にします `--next`または`--play`と同時に使ってもOK',
-                '`-n`': 'ランダム再生を無効にします 同上',
-                '`--list`': 'プレイリストを確認します',
-                '`--list-all`': '全てのプレイリストを確認します',
-                '`--list-make PlayListName`': 'プレイリストを作ります',
-                '`--list-change PlayListName`': '現在のプレイリストを変更します',
-                '`--list-remove PlayListName`' : 'プレイリストを削除します 現在のプレイリストはdefaultに変更されます',
-                '`--no-out`': '曲名の出力をしないようにするオプションです　標準では出力される様になっています',
-                '`--next`': '次の曲へ移ります',
-                '`--stop`': '曲の再生をストップします',
-                '`--pause`': '曲の再生を一時停止します',
-                '`'+prefix+'addmusic url [url]...`': '音楽をプレイリストに追加',
-                '`'+prefix+'delmusic url [url]...`': 'プレイリストから削除',
-                '`'+prefix+'musiclist`': 'プレイリストを確認(廃止予定)'}
-
-RoleCmdDict = OrderedDict()
-RoleCmdDict = {'`'+prefix+'role option`': '`!role`はオプションを必ず付けてね！',
-                '`--list`': '現在ある役職を確認できます',
-                '`--create RoleName`': '役職を新しく作れます',
-                '`--create-admin RoleName`': '管理者権限を持つ役職を作ります(管理者のみ)',
-                '`--remove RoleName`': '役職を消せます',
-                '`--add RoleName`': '自分に役職を追加します',
-                '`--del RoleName`': '自分の役職を消します',
-                '`--add-another UserName RoleName`': '`UserName`の役職を追加します(管理者のみ)',
-                '`--del-another UserName RoleName`': '`UserName`から役職を削除します(管理者のみ)'}
 
 TrueORFalse = {'Enable': True,
                 'Disable': False}
@@ -386,14 +344,14 @@ async def on_message(message):
             for Role in RoleList:
                 if '@everyone' == Role.name: pass
                 elif Role.permissions.administrator:
-                    RoleName = Role.name + '(変更不可)' if Role.name in UnmodifiableRole else Role.name
+                    RoleName = Role.name + '(unmodifiable)' if Role.name in UnmodifiableRole else Role.name
                     AdminRoles += RoleName+'\n'
                 else:
-                    RoleName = Role.name + '(変更不可)' if Role.name in UnmodifiableRole else Role.name
+                    RoleName = Role.name + '(unmodifiable)' if Role.name in UnmodifiableRole else Role.name
                     NomalRoles += RoleName+'\n'
-            embed = discord.Embed(description='役職総リスト', colour=0x228b22)
-            embed.add_field(name='管理役職', value=AdminRoles, inline=True)
-            embed.add_field(name='非管理役職', value=NomalRoles, inline=True)
+            embed = discord.Embed(description='Role List', colour=0x228b22)
+            embed.add_field(name='Admin', value=AdminRoles, inline=True)
+            embed.add_field(name='Local', value=NomalRoles, inline=True)
             await client.send_message(message.channel, embed=embed)
             await log.Log('Confirmation role list')
             return
@@ -700,7 +658,7 @@ async def on_message(message):
                     ineed[-1] += '-{}\n'.format(PlayListFiles[ListName][link])
                     NotFound = False
                     if len(ineed[-1]) > 750:
-                        await EmbedOut(message.channel, '欲しいものリスト page {}'.format(len(ineed)), '曲', ineed[-1], 0x303030)
+                        await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
                         ineed.append('')
                         NotFound = True
                 except:
@@ -710,7 +668,7 @@ async def on_message(message):
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
         SavePlaylist(PlayListFiles)
-        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, '欲しいものリスト page {}'.format(len(ineed)), '曲', ineed[-1], 0x303030)
+        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'delmusic'):
         NotFound = True
         links = message.content.split()[1:]
@@ -735,39 +693,32 @@ async def on_message(message):
                 notneed[-1] += '-{}\n'.format(Title)
                 await log.MusicLog('Del {}'.format(link))
                 if len(notneed[-1]) > 750:
-                    await EmbedOut(message.channel, '削除リスト page {}'.format(len(notneed)), '曲', notneed[-1], 0x749812)
+                    await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
                     notneed.append('')
                     NotFound = True
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
         SavePlaylist(PlayListFiles)
-        if not notneed[-1] == '' and not NotFound: await EmbedOut(message.channel, '削除リスト page {}'.format(len(notneed)), '曲', notneed[-1], 0x749812)
+        if not notneed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
         if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
         if len(cmds) > 1:
             for cmd in cmds:
-                if cmd == 'music':
+                if cmd == 'role' or cmd == 'music':
                     cmdline = ''
-                    for key, value in PlayCmdDict.items():
+                    for key, value in CommandDict[cmd].items():
                         cmdline += key + ': ' + value + '\n'
-                    embed = discord.Embed(description='playコマンド関連リスト', colour=0xe9967a)
-                    embed.add_field(name='コマンドたち', value=cmdline, inline=True)
-                    await client.send_message(message.channel, embed=embed)
-                if cmd == 'role':
-                    cmdline = ''
-                    for key, value in RoleCmdDict.items():
-                        cmdline += key + ': ' + value + '\n'
-                    embed = discord.Embed(description='roleコマンド関連リスト', colour=0x008b8b)
-                    embed.add_field(name='コマンドたち', value=cmdline, inline=True)
+                    embed = discord.Embed(description=cmd+' Commmand List', colour=0x008b8b)
+                    embed.add_field(name='Commands', value=cmdline, inline=True)
                     await client.send_message(message.channel, embed=embed)
         else:
             cmdline = ''
-            for key, value in CommandDict.items():
+            for key, value in CommandDict['help'].items():
                 cmdline += key + ': ' + value + '\n'
-            embed = discord.Embed(description='コマンド確認リスト', colour=0x4169e1)
-            embed.add_field(name='コマンドたち', value=cmdline, inline=True)
+            embed = discord.Embed(description='Commmand List', colour=0x4169e1)
+            embed.add_field(name='Commands', value=cmdline, inline=True)
             await client.send_message(message.channel, embed=embed)
     elif message.content.startswith(prefix+'version'):
         await log.Log(version)
@@ -823,7 +774,7 @@ async def on_message(message):
                     InteractiveBot = None
                     await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
                     await log.Log('Interactive bot mode is OFF')
-                    await client.change_presence(game=(None if not PlayFlag else discord.Game(name='IBOMusicPlayerT')))
+                    await client.change_presence(game=(None if not PlayFlag else discord.Game(name='MusicPlayer')))
                 else:
                     await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
                     await log.ErrorLog('Already interractive bot mode is OFF')
@@ -860,7 +811,7 @@ async def on_message(message):
                 os.chdir(maindir)
         for cmd in cmds[1:]:
                 if not '-' in cmd: os.chdir(cmd)
-    elif message.content.startswith(prefix+'cat'):
+    elif message.content.startswith(prefix+'cat') and message.author.id == config['ADMINDATA']['botowner']:
         cmds = message.content.split()
         outFlag = False
         if not len(cmds) == 1:
@@ -877,7 +828,7 @@ async def on_message(message):
             if not outFlag or not lines[-1] == '': await client.send_message(message.channel, lines[-1])
     elif message.content.startswith(prefix):
         await client.send_message(message.channel, '該当するコマンドがありません')
-        await log.ErrorLog('Command is notfind')
+        await log.ErrorLog('Command is notfound')
     elif IbotFlag and not message.author.bot:
         comment = InteractiveBot.Response(message.content)
         if not comment is None:
