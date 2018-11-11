@@ -196,7 +196,7 @@ PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TitleFlag = True
-version = '''PlatinaBot version: 2.3.3
+version = '''PlatinaBot version: 2.3.4
 Copyright (c) 2018 Glaz egy.'''
 log = LogControl('bot.log')
 config = ConfigParser()
