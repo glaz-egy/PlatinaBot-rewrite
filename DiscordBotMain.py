@@ -196,7 +196,8 @@ PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TitleFlag = True
-version = 'PlatinaBot version: 2.3.3'
+version = '''PlatinaBot version: 2.3.3
+Copyright (c) 2018 Glaz egy.'''
 log = LogControl('bot.log')
 config = ConfigParser()
 if os.path.isfile('config.ini'): config.read('config.ini', encoding='utf-8')
@@ -213,8 +214,9 @@ else:
 NowPlayList = 'default'
 PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
-client = discord.Client()
+maindir = os.getcwd()
 
+client = discord.Client()
 Cal = Calendar(client)
 
 CommandDict = OrderedDict()
@@ -224,7 +226,8 @@ CommandDict = {'`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}h
                 '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします ボットの認識子はいまのところ「はいどろ」 また、現在は「今何時」にのみ対応',
                 '`'+prefix+'version`': '現在のバージョンを確認できる',
                 '`'+prefix+'help`' : '今見てるのに説明いる？　ヘルプ用なんだけど',
-                '`'+prefix+'exit [ExitPassword]`': 'ボット管理者かExitPasswordを知っている人のみボットを停止できます'}
+                '`'+prefix+'exit [ExitPassword]`': 'ボット管理者かExitPasswordを知っている人のみボットを停止できます',
+                '隠し機能': '隠し機能が有るから探してみてね'}
 
 PlayCmdDict = OrderedDict()
 PlayCmdDict = {'`'+prefix+'music option`': '音楽を再生します　`-r`を付けるとランダム再生 `$[url]`でurlを優先再生 `--list`でプレイリストを確認',
@@ -697,40 +700,49 @@ async def on_message(message):
                     ineed[-1] += '-{}\n'.format(PlayListFiles[ListName][link])
                     NotFound = False
                     if len(ineed[-1]) > 750:
-                        await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
+                        await EmbedOut(message.channel, '欲しいものリスト page {}'.format(len(ineed)), '曲', ineed[-1], 0x303030)
                         ineed.append('')
                         NotFound = True
-                    SavePlaylist(PlayListFiles)
                 except:
                     await client.send_message(message.channel, '{} なんて無いよ'.format(linkraw))
                     await log.ErrorLog('{} is Not Found'.format(linkraw))
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, '欲しいものリスト', '曲', ineed[-1], 0x303030)
-    elif message.content.startswith(prefix+'musiclist'): await ListOut(message)
+        SavePlaylist(PlayListFiles)
+        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, '欲しいものリスト page {}'.format(len(ineed)), '曲', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'delmusic'):
+        NotFound = True
         links = message.content.split()[1:]
         if links[0] in PlayListFiles.keys():
             ListName = links[0]
             links.remove(links[0])
         else: ListName = NowPlayList
+        notneed = ['']
         for link in links:
             link = link.replace('https://www.youtube.com/watch?v=', '')
             link = link.replace('youtube.com/watch?v=', '')
             link = link.replace('https://youtu.be/', '')
             try:
+                print(link)
+                Title = PlayListFiles[ListName][link]
                 del PlayListFiles[ListName][link]
                 try:
                     PlayURLs.remove(link)
                 except:
                     pass
+                NotFound = False
+                notneed[-1] += '-{}\n'.format(Title)
                 await log.MusicLog('Del {}'.format(link))
-                await client.send_message(message.channel, '`{}` なんてもういらないよね！'.format('https://www.youtube.com/watch?v='+link))
-                SavePlaylist(PlayListFiles)
+                if len(notneed[-1]) > 750:
+                    await EmbedOut(message.channel, '削除リスト page {}'.format(len(notneed)), '曲', notneed[-1], 0x749812)
+                    notneed.append('')
+                    NotFound = True
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
+        SavePlaylist(PlayListFiles)
+        if not notneed[-1] == '' and not NotFound: await EmbedOut(message.channel, '削除リスト page {}'.format(len(notneed)), '曲', notneed[-1], 0x749812)
         if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
@@ -819,6 +831,32 @@ async def on_message(message):
         else:
             await client.send_message(message.channel, '現在このコマンドは無効化されています')
             await log.ErrorLog('Ibot mode is Disable')
+    elif message.content.startswith(prefix+'pwd'):
+        await client.send_message(message.channel, os.getcwd())
+    elif message.content.startswith(prefix+'ls'):
+        cmds = message.content.split()
+        AllFlag = False
+        nowdir = './'
+        for cmd in cmds[1:]:
+            if not '-' in cmd: nowdir = cmd
+        if '-a' in cmds: AllFlag = True
+        listfile = os.listdir(nowdir)
+        listfile.sort()
+        files = ['']
+        for fil in listfile:
+            if not fil[0] == '.' or AllFlag:
+                files[-1] += '{}\t'.format(fil)
+                if len(files[-1]) > 750:
+                    files[-1] += '\n'
+                    await client.send_message(message.channel, files[-1])
+                    files.append('')
+        await client.send_message(message.channel, files[-1])
+    elif message.content.startswith(prefix+'cd'):
+        cmds = message.content.split()
+        if len(cmds) == 1:
+                os.chdir(maindir)
+        for cmd in cmds[1:]:
+                if not '-' in cmd: os.chdir(cmd)
     elif message.content.startswith(prefix):
         await client.send_message(message.channel, '該当するコマンドがありません')
         await log.ErrorLog('Command is notfind')
