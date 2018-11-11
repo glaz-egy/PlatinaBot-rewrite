@@ -45,11 +45,11 @@ CommandDictJP['role'] = {'`'+prefix+'role option`': '`role`はオプションを
                         '`--list`': '現在ある役職を確認できます',
                         '`--create RoleName`': '役職を新しく作れます',
                         '`--create-admin RoleName`': '管理者権限を持つ役職を作ります(管理者のみ)',
-                        '`--remove RoleName`': '役職を消せます',
+                        '`--delete RoleName`': '役職を消せます',
                         '`--add RoleName`': '自分に役職を追加します',
-                        '`--del RoleName`': '自分の役職を消します',
+                        '`--rm RoleName`': '自分の役職を消します',
                         '`--add-another UserName RoleName`': '`UserName`の役職を追加します(管理者のみ)',
-                        '`--del-another UserName RoleName`': '`UserName`から役職を削除します(管理者のみ)'}
+                        '`--rm-another UserName RoleName`': '`UserName`から役職を削除します(管理者のみ)'}
 
 CommandDictEN = OrderedDict()
 CommandDictEN = {'help': OrderedDict(),

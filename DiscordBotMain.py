@@ -5,10 +5,10 @@ from datetime import datetime, date
 from collections import OrderedDict
 from random import random, randint
 from youtube_dl import YoutubeDL
+from retainBot import retain
 from copy import deepcopy
 from glob import glob
 import threading
-import interabot
 import discord
 import hashlib
 import asyncio
@@ -324,12 +324,12 @@ async def on_message(message):
     global TitleFlag
     if message.content.startswith(prefix+'role'):
         AddFlag = False
-        DelFlag = False
+        RemoveFlag = False
         AddAnotherFlag = False
-        DelAnotherFlag = False
+        RmAnotherFlag = False
         CmdFlag = False
         CreateFlag = False
-        RemoveFlag = False
+        DeleteFlag = False
         AdminFlag = False
         permissions = message.channel.permissions_for(message.author)
         cmd = message.content.split()
@@ -355,13 +355,13 @@ async def on_message(message):
             await client.send_message(message.channel, embed=embed)
             await log.Log('Confirmation role list')
             return
-        if '--del' in cmd:
+        if '--rm' in cmd:
             if TrueORFalse[config['ROLECONF']['del_role_me']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
-            DelFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del')+1)
+            RemoveFlag = True
+            RoleName = await CmdSpliter(cmd, cmd.index('--rm')+1)
         if '--add' in cmd:
             if TrueORFalse[config['ROLECONF']['add_role_me']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
@@ -377,14 +377,14 @@ async def on_message(message):
             AddAnotherFlag = True
             RoleName = await CmdSpliter(cmd, cmd.index('--add-another')+2)
             UserName = await CmdSpliter(cmd, cmd.index('--add-another')+1)
-        if '--del-another' in cmd:
+        if '--rm-another' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
-            DelAnotherFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--del-another')+2)
-            UserName = await CmdSpliter(cmd, cmd.index('--del-another')+1)
+            RmAnotherFlag = True
+            RoleName = await CmdSpliter(cmd, cmd.index('--rm-another')+2)
+            UserName = await CmdSpliter(cmd, cmd.index('--rm-another')+1)
         if '--create' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
@@ -400,14 +400,14 @@ async def on_message(message):
             CreateFlag = True
             AdminFlag = True
             RoleName = await CmdSpliter(cmd, cmd.index('--create-admin')+1)
-        if '--remove' in cmd:
+        if '--delete' in cmd:
             if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
-            RemoveFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--remove')+1)
-        if (CreateFlag or RemoveFlag) and (AddFlag or DelFlag):
+            DeleteFlag = True
+            RoleName = await CmdSpliter(cmd, cmd.index('--delete')+1)
+        if (CreateFlag or DeleteFlag) and (AddFlag or RemoveFlag):
             await client.send_message(message.channel, 'そのコマンドは両立出来ないなぁ')
             await log.ErrorLog('A command for the server and a command for the member are entered error')
         if CreateFlag and RemoveFlag:
@@ -435,7 +435,7 @@ async def on_message(message):
                 await client.send_message(message.channel, 'あるよ！ {} あるよッ！'.format(RoleName))
                 await log.Log('Role: {} is exist in this server yet'.format(RoleName))
             return
-        elif RemoveFlag:
+        elif DeleteFlag:
             role = discord.utils.get(message.author.server.roles, name=RoleName)
             if role.permissions.administrator and not permissions.administrator:
                 await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職を削除できません'.format(message.author.name))
@@ -443,9 +443,9 @@ async def on_message(message):
                 return
             await client.delete_role(message.server, role)
             await client.send_message(message.channel, '{}はもう消されてしまいました……'.format(RoleName))
-            await log.Log('Remove role: {}'.format(RoleName))
+            await log.Log('Delete role: {}'.format(RoleName))
             return
-        if AddFlag and DelFlag or AddAnotherFlag and DelAnotherFlag:
+        if AddFlag and RemoveFlag or AddAnotherFlag and RmAnotherFlag:
             await client.send_message(message.channel, '追加するの？　消すの？　はっきりしてよ……')
             await log.ErrorLog('Add and Del command are entered')
             return
@@ -464,7 +464,7 @@ async def on_message(message):
             await client.add_roles(user, role)
             await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(UserName, RoleName))
             await log.Log('Add role: {} in {}'.format(UserName, RoleName))
-        elif DelAnotherFlag:
+        elif RmAnotherFlag:
             user = discord.utils.get(message.author.server.menbers, name=UserName)
             if user is None:
                 await client.send_message(message.channel, 'そんな人はいないんだけどな')
@@ -472,7 +472,7 @@ async def on_message(message):
                 return
             await client.remove_roles(user, role)
             await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(UserName, RoleName))
-            await log.Log('Del role: {}\'s {}'.format(UserName, RoleName))
+            await log.Log('Remove role: {}\'s {}'.format(UserName, RoleName))
         elif AddFlag:
             if role.permissions.administrator and not permissions.administrator:
                 await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職には成れません'.format(message.author.name))
@@ -485,11 +485,11 @@ async def on_message(message):
             else:
                 await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
-        elif DelFlag:
+        elif RemoveFlag:
             if isChange:
                 await client.remove_roles(message.author, role)
                 await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(message.author.name, RoleName))
-                await log.Log('Del role: {}\'s {}'.format(message.author.name, RoleName))
+                await log.Log('Remove role: {}\'s {}'.format(message.author.name, RoleName))
             else:
                 await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
@@ -761,7 +761,7 @@ async def on_message(message):
             if '--start' in cmd:
                 if not IbotFlag:
                     IbotFlag = True
-                    InteractiveBot = interabot.interabot.Bot()
+                    InteractiveBot = retain.retain.Bot()
                     await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
                     await log.Log('Interactive bot mode is ON')
                     await client.change_presence(game=discord.Game(name='IBOT'))
