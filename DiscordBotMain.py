@@ -14,7 +14,6 @@ import hashlib
 import asyncio
 import pickle
 import signal
-import syncer
 import sched
 import time
 import sys
@@ -51,13 +50,13 @@ class Calendar:
         self.CalData = {}
         self.bot = bot
 
-    def CalTask(self):
+    async def CalTask(self):
         print('test')
         self.CalData['2018-11-10'] = ['test', 'korehatesoto', self.bot.get_channel('508137939491094557'), False]
         today = str(date.today())
         embed = discord.Embed(description='2018-11-10', colour=0x000000)
         embed.add_field(name=self.CalData['2018-11-10'][0], value=self.CalData['2018-11-10'][1], inline=True)
-        syncer.sync(self.bot.send_message(self.bot.get_channel('508137939491094557'), embed=embed))
+        await self.bot.send_message(self.bot.get_channel('508137939491094557'), embed=embed)
 
     def CalRegister(self, eventDay, eventName, eventContent, outChannel, Loop=False):
         self.CalData[eventDay] = [eventName, eventContent, outChannel, Loop]
