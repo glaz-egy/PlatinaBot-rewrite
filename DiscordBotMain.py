@@ -836,16 +836,19 @@ async def on_message(message):
     elif message.content.startswith(prefix+'ls'):
         cmds = message.content.split()
         AllFlag = False
+        LineFlag = False
         nowdir = './'
         for cmd in cmds[1:]:
             if not '-' in cmd: nowdir = cmd
         if '-a' in cmds: AllFlag = True
+        if '-l' in cmds: LineFlag = True
         listfile = os.listdir(nowdir)
         listfile.sort()
         files = ['']
         for fil in listfile:
             if not fil[0] == '.' or AllFlag:
-                files[-1] += '{}\t'.format(fil)
+                if LineFlag: files[-1]  += '{}\n'.format(fil) if os.path.isfile(nowdir+'/'+fil) else '**{}**\n'.format(fil)
+                else:files[-1] += '{}\t'.format(fil) if os.path.isfile(nowdir+'/'+fil) else '**{}**\t'.format(fil)
                 if len(files[-1]) > 750:
                     files[-1] += '\n'
                     await client.send_message(message.channel, files[-1])
@@ -857,6 +860,21 @@ async def on_message(message):
                 os.chdir(maindir)
         for cmd in cmds[1:]:
                 if not '-' in cmd: os.chdir(cmd)
+    elif message.content.startswith(prefix+'cat'):
+        cmds = message.content.split()
+        outFlag = False
+        if not len(cmds) == 1:
+            with open(cmds[1], 'r', encoding='utf-8') as f:
+                files = f.readlines()
+            lines = ['']
+            for line in files:
+                outFlag = True
+                if len(line) == 1: lines[-1] += line
+                else: lines[-1] += '`{}`\n'.format(line.replace('\n', ''))
+                if len(lines[-1]) > 750:
+                    await client.send_message(message.channel, lines[-1])
+                    lines.append('')
+            if not outFlag or not lines[-1] == '': await client.send_message(message.channel, lines[-1])
     elif message.content.startswith(prefix):
         await client.send_message(message.channel, '該当するコマンドがありません')
         await log.ErrorLog('Command is notfind')
