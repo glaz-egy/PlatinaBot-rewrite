@@ -312,16 +312,9 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    global MusicMessage
-    global player
-    global InteractiveBot
-    global NowPlayList
-    global PlayURLs
-    global RandomFlag
-    global PauseFlag
-    global PlayFlag
-    global IbotFlag
-    global TitleFlag
+    global MusicMessage, player, InteractiveBot
+    global NowPlayList, PlayURLs, RandomFlag
+    global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     if message.content.startswith(prefix+'role'):
         AddFlag = False
         RemoveFlag = False
