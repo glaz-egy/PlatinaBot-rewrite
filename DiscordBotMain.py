@@ -734,8 +734,8 @@ async def on_message(message):
             await sys.exit(0)
         else:
             PermissionErrorFunc(message)
-    elif message.content.startswith(prefix+'debag'):
-        await on_member_join(message.author)
+    elif message.content.startswith(prefix+'debug'):
+        await client.send_message(message.channel, client.email)
     elif message.content.startswith(prefix+'say'):
         cmds = message.content.split()[1:]
         out = ''
