@@ -534,9 +534,9 @@ async def on_message(message):
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
                 await log.MusicLog('Make play list {}'.format(PlayListName))
             return
-        if '--list-remove' in cmd:
+        if '--list-delete' in cmd:
             try:
-                PlayListName = cmd[cmd.index('--list-remove')+1]
+                PlayListName = cmd[cmd.index('--list-delete')+1]
             except:
                 await client.send_message(message.channel, 'オプションに引数が無いよ！')
                 await log.ErrorLog('Not argment')
