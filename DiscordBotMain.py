@@ -535,7 +535,7 @@ async def on_message(message):
             return
         if '--list-remove' in cmd:
             try:
-                PlayListName = cmd[cmd.index('--list-make')+1]
+                PlayListName = cmd[cmd.index('--list-remove')+1]
             except:
                 await client.send_message(message.channel, 'オプションに引数が無いよ！')
                 await log.ErrorLog('Not argment')
