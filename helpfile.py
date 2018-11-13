@@ -28,6 +28,7 @@ CommandDictJP['music'] = {'`'+prefix+'music option`': '音楽関連のコマン�
                         '`-n`': 'ランダム再生を無効にします 同上',
                         '`--list`': 'プレイリストを確認します',
                         '`--list-all`': '全てのプレイリストを確認します',
+                        '`--list-list`': 'リストのリストを確認します',
                         '`--list-make PlayListName`': 'プレイリストを作ります',
                         '`--list-change PlayListName`': '現在のプレイリストを変更します',
                         '`--list-remove PlayListName`' : 'プレイリストを削除します 現在のプレイリストはdefaultに変更されます',

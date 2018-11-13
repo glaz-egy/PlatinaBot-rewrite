@@ -129,6 +129,7 @@ class MusicPlayer:
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
             await self.bot.send_message(message.channel, fmt.format(type(e).__name__, e))
+            await NextSet(MusicMessage)
         else:
             player.volume = 0.3
             entry = VoiceEntry(message, player)
@@ -545,7 +546,9 @@ async def on_message(message):
                 SavePlaylist(PlayListFiles)
                 await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
                 await log.MusicLog('Remove play list {}'.format(PlayListName))
-                NowPlayList = 'default'
+                if NowPlayList == PlayListName:
+                    NowPlayList = 'default'
+                    PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
                 await client.send_message(message.channel, 'そのプレイリストは存在しません')
                 await log.ErrorLog('Remove request not exist play list')
@@ -557,6 +560,7 @@ async def on_message(message):
                 await client.send_message(message.channel, '{}をクリアしました'.format(ClearPlaylist))
                 await log.MusicLog('Cleared {}'.format(ClearPlaylist))
                 SavePlaylist(PlayListFiles)
+                PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
                 await client.send_message(message.channel, 'プレイリスト名を入力してください')
                 await log.ErrorLog('Need Playlist name')
