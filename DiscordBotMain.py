@@ -3,6 +3,7 @@
 from configparser import ConfigParser
 from datetime import datetime, date
 from collections import OrderedDict
+from argparse import ArgumentParser
 from random import random, randint
 from youtube_dl import YoutubeDL
 from retainBot import retain
@@ -180,6 +181,13 @@ def LoadPlaylist(FileName='playlist.plf'):
         PLdata = pickle.load(f)
     return PLdata
 
+def ArgsInit():
+    parser = ArgumentParser(description='Playlist, log and config set args')
+    parser.add_argument('--playlist', default='playlist.plf')
+    parser.add_argument('--log', default='bot.log')
+    parser.add_argument('--config', default='config.ini')
+    return parser.parse_args()
+
 MusicMessage = None
 player = None
 InteractiveBot = None
@@ -193,9 +201,10 @@ IbotFlag = False
 TitleFlag = True
 version = '''PlatinaBot version: 2.3.4
 Copyright (c) 2018 Glaz egy.'''
-log = LogControl('bot.log')
+args = ArgsInit()
+log = LogControl(args.log)
 config = ConfigParser()
-if os.path.isfile('config.ini'): config.read('config.ini', encoding='utf-8')
+if os.path.isfile(args.config): config.read(args.config, encoding='utf-8')
 else:
     log.ErrorLog('Config file not exist')
     sys.exit(1)
@@ -203,11 +212,11 @@ prefix = config['BOTDATA']['cmdprefix']
 with open('help.dat', 'rb') as f:
     Data = pickle.load(f)
     CommandDict = Data['JP']
-if os.path.isfile('playlist.plf'): PlayListFiles = LoadPlaylist()
+if os.path.isfile(args.playlist): PlayListFiles = LoadPlaylist(FileName=args.playlist)
 else:
     PlayListFiles['default'] = {}
-    SavePlaylist(PlayListFiles)
-    PlayListFiles = LoadPlaylist()
+    SavePlaylist(PlayListFiles, FileName=args.playlist)
+    PlayListFiles = LoadPlaylist(FileName=args.playlist)
 NowPlayList = 'default'
 PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
@@ -306,6 +315,10 @@ async def OptionError(message, cmd):
         return
     await client.send_message(message.channel, '`'+cmd[0]+'`だけじゃ何したいのか分からないんだけど')
     await log.ErrorLog('no option error') 
+
+async def NotArgsment(message):
+    await client.send_message(message.channel, 'オプションに引数が無いよ！')
+    await log.ErrorLog('Not argment')
 
 @client.event
 async def on_ready():
@@ -520,15 +533,14 @@ async def on_message(message):
             try:
                 PlayListName = cmd[cmd.index('--list-make')+1]
             except:
-                await client.send_message(message.channel, 'オプションに引数が無いよ！')
-                await log.ErrorLog('Not argment')
+                await NotArgsment(message)
                 return
             if PlayListName in PlayListFiles.keys():
                 await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
                 await log.ErrorLog('Make request exist play list')
             else:
                 PlayListFiles[PlayListName] = {}
-                SavePlaylist(PlayListFiles)
+                SavePlaylist(PlayListFiles, FileName=args.playlist)
                 NowPlayList = PlayListName
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
@@ -538,12 +550,11 @@ async def on_message(message):
             try:
                 PlayListName = cmd[cmd.index('--list-delete')+1]
             except:
-                await client.send_message(message.channel, 'オプションに引数が無いよ！')
-                await log.ErrorLog('Not argment')
+                await NotArgsment(message)
                 return
             if PlayListName in PlayListFiles.keys() and not 'default' == PlayListName:
                 del PlayListFiles[PlayListName]
-                SavePlaylist(PlayListFiles)
+                SavePlaylist(PlayListFiles, FileName=args.playlist)
                 await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
                 await log.MusicLog('Remove play list {}'.format(PlayListName))
                 if NowPlayList == PlayListName:
@@ -551,26 +562,54 @@ async def on_message(message):
                     PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
                 await client.send_message(message.channel, 'そのプレイリストは存在しません')
-                await log.ErrorLog('Remove request not exist play list')
+                await log.ErrorLog('Delete request not exist play list')
+            return
+        if '--list-rename' in cmd:
+            try:
+                prePlayListName = cmd[cmd.index('--list-rename')+1]
+                sufPlayListName = cmd[cmd.index('--list-rename')+2]
+            except:
+                await NotArgsment(message)
+                return
+            if sufPlayListName in PlayListFiles.keys() and not 'default' == prePlayListName:
+                await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
+                await log.ErrorLog('Make request exist play list')
+            elif prePlayListName in PlayListFiles.keys() and not 'default' == prePlayListName:
+                PlayListFiles[sufPlayListName] = deepcopy(PlayListFiles[prePlayListName])
+                if NowPlayList == prePlayListName: NowPlayList = sufPlayListName
+                del PlayListFiles[prePlayListName]
+                SavePlaylist(PlayListFiles, FileName=args.playlist)
+                PlayURLs = list(PlayListFiles[NowPlayList].keys())
+                await client.send_message(message.channel, '{}の名前を{}に変更します'.format(prePlayListName, sufPlayListName))
+                await log.MusicLog('Rename play list {}'.format(prePlayListName))
+            elif 'default' == prePlayListName:
+                await client.send_message(message.channel, 'defaultを変更することは出来ません')
+                await log.ErrorLog('Cannot renaem default')
+            else:
+                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await log.ErrorLog('Rename request not exist play list')
             return
         if '--list-clear' in cmd:
-            if len(cmd) > 2:
+            try:
                 ClearPlaylist = cmd[cmd.index('--list-clear')+1]
+            except:
+                await NotArgsment(message)
+            if ClearPlaylist in PlayListFiles.keys():
                 PlayListFiles[ClearPlaylist] = {}
                 await client.send_message(message.channel, '{}をクリアしました'.format(ClearPlaylist))
                 await log.MusicLog('Cleared {}'.format(ClearPlaylist))
-                SavePlaylist(PlayListFiles)
+                SavePlaylist(PlayListFiles, FileName=args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
-                await client.send_message(message.channel, 'プレイリスト名を入力してください')
-                await log.ErrorLog('Need Playlist name')
+                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await log.ErrorLog('Clear request not exist play list')
             return
         if '--list-clear-all' in cmd:
             for key in PlayListFiles.keys():
                 PlayListFiles[key] = {}
                 await client.send_message(message.channel, '{}をクリアしました'.format(key))
                 await log.MusicLog('Cleared {}'.format(key))
-            SavePlaylist(PlayListFiles)
+            SavePlaylist(PlayListFiles, FileName=args.playlist)
             return
         if len(cmd) >= 2:
             for cmdpar in cmd:
@@ -664,7 +703,7 @@ async def on_message(message):
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-        SavePlaylist(PlayListFiles)
+        SavePlaylist(PlayListFiles, FileName=args.playlist)
         if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'delmusic'):
         NotFound = True
@@ -696,7 +735,7 @@ async def on_message(message):
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
-        SavePlaylist(PlayListFiles)
+        SavePlaylist(PlayListFiles, FileName=args.playlist)
         if not notneed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
         if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
