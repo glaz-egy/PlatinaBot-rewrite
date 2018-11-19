@@ -338,20 +338,21 @@ async def on_ready():
 @client.event
 async def on_message(message):
     global MusicMessage, player, InteractiveBot
-    global NowPlayList, PlayURLs, RandomFlag, SpellInput
+    global NowPlayList, PlayURLs, RandomFlag
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
+            SpellInput = False
+            await log.Log('Create spell {}'.format(SpellNameG))
             SpellDataG.remove('end')
+            await client.send_message(message.channel, '入力を終了しました')
             if IbotFlag: InteractiveBot.Spell.AddSpell(SpellDataG, SpellNameG)
             else: Spell.AddSpell(SpellDataG, SpellNameG)
             print(Spell.SpellDic)
-            await log.Log('Create spell {}'.format(SpellNameG))
             SpellNameG = ''
             SpellDataG = []
-            SpellInput = False
     elif message.content.startswith(prefix+'role'):
         AddFlag = False
         RemoveFlag = False
