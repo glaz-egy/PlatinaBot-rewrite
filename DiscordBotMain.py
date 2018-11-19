@@ -186,6 +186,7 @@ def ArgsInit():
     parser.add_argument('--playlist', default='playlist.plf')
     parser.add_argument('--log', default='bot.log')
     parser.add_argument('--config', default='config.ini')
+    parser.add_argument('--spell', default='Spelldata.sp')
     return parser.parse_args()
 
 MusicMessage = None
@@ -194,12 +195,15 @@ InteractiveBot = None
 PlayListFiles = {}
 PlayListName = []
 NextList = []
+SpellDataG = []
+SpellNameG = ''
 RandomFlag = False
 PauseFlag = False
 PlayFlag = False
 IbotFlag = False
 TitleFlag = True
-version = '''PlatinaBot version: 2.3.4
+SpellInput = False
+version = '''PlatinaBot version: 2.3.5
 Copyright (c) 2018 Glaz egy.'''
 args = ArgsInit()
 log = LogControl(args.log)
@@ -222,6 +226,7 @@ PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
 maindir = os.getcwd()
 
+Spell = retain.spell.Spell(args.spell)
 client = discord.Client()
 Cal = Calendar(client)
 
@@ -301,12 +306,18 @@ async def PermissionErrorFunc(message):
     await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
     await log.ErrorLog('Do not have permissions')
 
-async def CmdSpliter(cmd, index):
+def CmdSpliter(cmd, index, sufIndex=False):
+    Flag = True
     if '"' in cmd[index]:
-        tempStr = cmd[index] + ' ' + cmd[index+1]
-        SplitStr = tempStr.replace('"', '')
+        tempStr = cmd[index]
+        while Flag:
+            index += 1
+            tempStr = ' ' + cmd[index]
+            if '"' in cmd[index]: break
+        SplitStr = tempStr.replace('"', '').strip()
     else: SplitStr = cmd[index]
-    return SplitStr
+    if sufIndex: return SplitStr, index
+    else: return SplitStr
 
 async def OptionError(message, cmd):
     if len(cmd) > 1:
@@ -327,9 +338,20 @@ async def on_ready():
 @client.event
 async def on_message(message):
     global MusicMessage, player, InteractiveBot
-    global NowPlayList, PlayURLs, RandomFlag
+    global NowPlayList, PlayURLs, RandomFlag, SpellInput
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
-    if message.content.startswith(prefix+'role'):
+    global SpellInput, SpellDataG, SpellNameG
+    if SpellInput:
+        SpellDataG.append(message.content)
+        if SpellDataG[-1] == 'exit':
+            SpellDataG.remove('exit')
+            if IbotFlag: InteractiveBot.Spell.AddSpell(SpellDataG, SpellNameG)
+            else: Spell.AddSpell(SpellDataG, SpellNameG)
+            print(Spell.SpellDic)
+            SpellNameG = ''
+            SpellDataG = []
+            SpellInput = False
+    elif message.content.startswith(prefix+'role'):
         AddFlag = False
         RemoveFlag = False
         AddAnotherFlag = False
@@ -368,37 +390,37 @@ async def on_message(message):
                 return
             CmdFlag = True
             RemoveFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--rm')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--rm')+1)
         if '--add' in cmd:
             if TrueORFalse[config['ROLECONF']['add_role_me']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             AddFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--add')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--add')+1)
         if '--add-another' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             AddAnotherFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--add-another')+2)
-            UserName = await CmdSpliter(cmd, cmd.index('--add-another')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--add-another')+2)
+            UserName = CmdSpliter(cmd, cmd.index('--add-another')+1)
         if '--rm-another' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             RmAnotherFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--rm-another')+2)
-            UserName = await CmdSpliter(cmd, cmd.index('--rm-another')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--rm-another')+2)
+            UserName = CmdSpliter(cmd, cmd.index('--rm-another')+1)
         if '--create' in cmd:
             if not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             CreateFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--create')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--create')+1)
         if '--create-admin' in cmd:
             if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
@@ -406,14 +428,14 @@ async def on_message(message):
             CmdFlag = True
             CreateFlag = True
             AdminFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--create-admin')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--create-admin')+1)
         if '--delete' in cmd:
             if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
                 await PermissionErrorFunc(message)
                 return
             CmdFlag = True
             DeleteFlag = True
-            RoleName = await CmdSpliter(cmd, cmd.index('--delete')+1)
+            RoleName = CmdSpliter(cmd, cmd.index('--delete')+1)
         if (CreateFlag or DeleteFlag) and (AddFlag or RemoveFlag):
             await client.send_message(message.channel, 'そのコマンドは両立出来ないなぁ')
             await log.ErrorLog('A command for the server and a command for the member are entered error')
@@ -756,6 +778,46 @@ async def on_message(message):
             embed = discord.Embed(description='Commmand List', colour=0x4169e1)
             embed.add_field(name='Commands', value=cmdline, inline=True)
             await client.send_message(message.channel, embed=embed)
+    elif message.content.startswith(prefix+'spell'):
+        cmd = message.content.split()
+        if '--list' in cmd:
+            SpellName = ['']
+            OutFlag = False
+            for spell in Spell.SpellDic.keys():
+                if not spell == 'SpellList': SpellName[-1] += spell + '\n'
+                if len(SpellName[-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
+                    SpellName.append('')
+            if not OutFlag or SpellName[-1]:
+                await EmbedOut(message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
+            return
+        elif '--spell' in cmd:
+            SpellName = CmdSpliter(cmd, cmd.index('--spell')+1)
+            Spelltext = ['']
+            OutFlag = False
+            for spell in Spell.SpellDic[SpellName]:
+                if not spell == 'SpellList': Spelltext[-1] += spell + '\n'
+                if len(Spelltext[-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, disc='Spell', playname='Spells text', url=Spelltext[-1], color=0x000000)
+                    Spelltext.append('')
+            if not OutFlag or Spelltext[-1]:
+                await EmbedOut(message.channel, disc='Spell', playname='Spell text', url=Spelltext[-1], color=0x000000)
+            return
+        elif '--del' in cmd:
+            SpellName = CmdSpliter(cmd, cmd.index('--del')+1)
+            if IbotFlag: InteractiveBot.Spell.DelSpell(SpellName)
+            else: Spell.DelSpell(SpellName)
+        elif '--add' in cmd:
+            SpellName, index = CmdSpliter(cmd, cmd.index('--add')+1, sufIndex=True)
+            SpellData = cmd[index+1:]
+            if IbotFlag: InteractiveBot.Spell.AddSpell(SpellData, SpellName)
+            else: Spell.AddSpell(SpellData, SpellName)
+            print(Spell.SpellDic)
+        elif '--add-line' in cmd:
+            SpellNameG = CmdSpliter(cmd, cmd.index('--add-line')+1)
+            SpellInput = True
     elif message.content.startswith(prefix+'version'):
         await log.Log(version)
         await client.send_message(message.channel, version)
@@ -797,7 +859,7 @@ async def on_message(message):
             if '--start' in cmd:
                 if not IbotFlag:
                     IbotFlag = True
-                    InteractiveBot = retain.retain.Bot()
+                    InteractiveBot = retain.retain.Bot(Spell)
                     await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
                     await log.Log('Interactive bot mode is ON')
                     await client.change_presence(game=discord.Game(name='IBOT'))
