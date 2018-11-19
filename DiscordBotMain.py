@@ -348,6 +348,7 @@ async def on_message(message):
             if IbotFlag: InteractiveBot.Spell.AddSpell(SpellDataG, SpellNameG)
             else: Spell.AddSpell(SpellDataG, SpellNameG)
             print(Spell.SpellDic)
+            await log.Log('Create spell {}'.format(SpellNameG))
             SpellNameG = ''
             SpellDataG = []
             SpellInput = False
@@ -814,6 +815,7 @@ async def on_message(message):
             SpellData = cmd[index+1:]
             if IbotFlag: InteractiveBot.Spell.AddSpell(SpellData, SpellName)
             else: Spell.AddSpell(SpellData, SpellName)
+            await log.Log('Create spell {}'.format(SpellName))
             print(Spell.SpellDic)
         elif '--add-line' in cmd:
             SpellNameG = CmdSpliter(cmd, cmd.index('--add-line')+1)
