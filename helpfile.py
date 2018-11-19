@@ -16,6 +16,7 @@ CommandDictJP = {'help': OrderedDict(),
 
 CommandDictJP['help'] = { '`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
                         '`'+prefix+'music`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
+                        '`'+prefix+'spell`': '呪文を唱えるコマンド `{}help music`で確認できます'.format(prefix),
                         '`'+prefix+'say SayText`': 'ボットがSayTextの内容を発言します それだけのコマンド',
                         '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします',
                         '`'+prefix+'version`': '現在のバージョンを確認できる',
@@ -51,6 +52,13 @@ CommandDictJP['role'] = {'`'+prefix+'role option`': '`role`はオプションを
                         '`--rm RoleName`': '自分の役職を消します',
                         '`--add-another UserName RoleName`': '`UserName`の役職を追加します(管理者のみ)',
                         '`--rm-another UserName RoleName`': '`UserName`から役職を削除します(管理者のみ)'}
+
+CommandDictJP['spell'] = {'`'+prefix+'spell option`': '`呪文用のコマンド`',
+                        '`--list`': '呪文を確認します',
+                        '`--spell`': '呪文の中身を確認します',
+                        '`--add SpellName Spelltext [Spelltext]...`': '呪文を追加します 呪文名 につづけて 一節ずつスペースを空けて入力してください',
+                        '`--add-line SpellName`': '呪文を追加します 呪文名 と一緒に入力した後 一節ずつ入力してください',
+                        '`--del SpellName`': '呪文を削除します'}
 
 CommandDictEN = OrderedDict()
 CommandDictEN = {'help': OrderedDict(),
