@@ -343,8 +343,8 @@ async def on_message(message):
     global SpellInput, SpellDataG, SpellNameG
     if SpellInput:
         SpellDataG.append(message.content)
-        if SpellDataG[-1] == 'exit':
-            SpellDataG.remove('exit')
+        if SpellDataG[-1] == 'end':
+            SpellDataG.remove('end')
             if IbotFlag: InteractiveBot.Spell.AddSpell(SpellDataG, SpellNameG)
             else: Spell.AddSpell(SpellDataG, SpellNameG)
             print(Spell.SpellDic)

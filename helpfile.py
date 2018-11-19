@@ -16,7 +16,7 @@ CommandDictJP = {'help': OrderedDict(),
 
 CommandDictJP['help'] = { '`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
                         '`'+prefix+'music`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
-                        '`'+prefix+'spell`': '呪文を唱えるコマンド `{}help music`で確認できます'.format(prefix),
+                        '`'+prefix+'spell`': '呪文を唱えるコマンド `{}help spell`で確認できます'.format(prefix),
                         '`'+prefix+'say SayText`': 'ボットがSayTextの内容を発言します それだけのコマンド',
                         '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします',
                         '`'+prefix+'version`': '現在のバージョンを確認できる',
