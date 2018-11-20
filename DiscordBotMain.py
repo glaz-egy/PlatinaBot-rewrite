@@ -773,7 +773,7 @@ async def on_message(message):
         cmds = message.content.split()
         if len(cmds) > 1:
             for cmd in cmds:
-                if cmd == 'role' or cmd == 'music' or cmd == 'spell':
+                if cmd == 'role' or cmd == 'music' or cmd == 'spell' or cmd == 'study':
                     cmdline = ''
                     for key, value in CommandDict[cmd].items():
                         cmdline += key + ': ' + value + '\n'
