@@ -4,7 +4,7 @@ from configparser import ConfigParser
 from datetime import datetime, date
 from collections import OrderedDict
 from argparse import ArgumentParser
-from random import random, randint
+from random import random, randint, choice
 from youtube_dl import YoutubeDL
 from retainBot import retain
 from copy import deepcopy
@@ -187,6 +187,7 @@ def ArgsInit():
     parser.add_argument('--log', default='bot.log')
     parser.add_argument('--config', default='config.ini')
     parser.add_argument('--spell', default='Spelldata.sp')
+    parser.add_argument('--study', default='Studydata.sf')
     return parser.parse_args()
 
 MusicMessage = None
@@ -203,6 +204,10 @@ PlayFlag = False
 IbotFlag = False
 TitleFlag = True
 SpellInput = False
+QuesDic = {}
+QuesFlag = False
+Q = ''
+A = ''
 version = '''PlatinaBot version: 2.3.5
 Copyright (c) 2018 Glaz egy.'''
 args = ArgsInit()
@@ -227,6 +232,7 @@ UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
 maindir = os.getcwd()
 
 Spell = retain.spell.Spell(args.spell)
+Study = retain.study.Study(args.study)
 client = discord.Client()
 Cal = Calendar(client)
 
@@ -341,6 +347,7 @@ async def on_message(message):
     global NowPlayList, PlayURLs, RandomFlag
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
+    global QuesDic, QuesFlag, Q, A
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
@@ -821,6 +828,111 @@ async def on_message(message):
         elif '--add-line' in cmd:
             SpellNameG = CmdSpliter(cmd, cmd.index('--add-line')+1)
             SpellInput = True
+    elif message.content.startswith(prefix+'study'):
+        cmd = message.content.split()
+        CmdFlag = False
+        if '--list-subject' in cmd:
+            CmdFlag = True
+            Subject = ['']
+            OutFlag = False
+            for sub in Study.StudyDic.keys():
+                Subject[-1] += sub + '\n'
+                if len(Subject[-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
+                    Subject.append('')
+            if not OutFlag or Subject[-1]:
+                await EmbedOut(message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
+            return
+        elif '--list-unit' in cmd:
+            CmdFlag = True
+            Subject = CmdSpliter(cmd, cmd.index('--list-unit')+1)
+            Unit = ['']
+            OutFlag = False
+            for unit in Study.StudyDic[Subject].keys():
+                Unit[-1] += unit + '\n'
+                if len(Unit[-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
+                    Unit.append('')
+            if not OutFlag or Unit[-1]:
+                await EmbedOut(message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
+            return
+        elif '--list-ques' in cmd:
+            CmdFlag = True
+            Subject, index = CmdSpliter(cmd, cmd.index('--list-ques')+1, sufIndex=True)
+            Unit = CmdSpliter(cmd, index+1)
+            QuesAns = ['']
+            OutFlag = False
+            for ques, ans in Study.StudyDic[Subject][Unit].items():
+                QuesAns[-1] += ques + '  -  Ans:' + ans + '\n'
+                if len(QuesAns[-1]) > 750:
+                    OutFlag = True
+                    await EmbedOut(message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
+                    QuesAns.append('')
+            if not OutFlag or QuesAns[-1]:
+                await EmbedOut(message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
+            return
+        elif '--del' in cmd:
+            CmdFlag = True
+            delkey = cmd[cmd.index('--del')+1]
+            DelObj = cmd[cmd.index('--del')+2]
+            Study.DelStudy(DelObj, delkey)
+            await client.send_message(message.channel, '問題を削除します')
+        elif '--add' in cmd:
+            CmdFlag = True
+            Subject, index = CmdSpliter(cmd, cmd.index('--add')+1, sufIndex=True)
+            Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
+            Ques, index = CmdSpliter(cmd, index+1, sufIndex=True)
+            Ans, index = CmdSpliter(cmd, index+1, sufIndex=True)
+            Study.AddStudy(Subject, Unit, [Ques,], [Ans,])
+            await client.send_message(message.channel, '問題を追加します')
+        elif '--add-m' in cmd:
+            CmdFlag = True
+            Qs = []
+            As = []
+            await client.send_message(message.channel, '問題を複数追加します')
+            Subject, index = CmdSpliter(cmd, cmd.index('--add-m')+1, sufIndex=True)
+            Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
+            for QuesAns in cmd[index+1:]:
+                Ques, Ans = QuesAns.split(';')
+                Qs.append(Ques)
+                As.append(Ans)
+            Study.AddStudy(Subject, Unit, Qs, As)
+        elif '--start' in cmd:
+            CmdFlag = True
+            Subject, index = CmdSpliter(cmd, cmd.index('--start')+1, sufIndex=True)
+            Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
+            if not cmd[index+1:] == []:
+                QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
+                for unit in cmd[index+1:]:
+                    QuesDic.update(deepcopy(Study.StudyDic[Subject][unit]))
+            else: QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
+            QuesFlag = True
+            Q = choice(list(QuesDic.keys()))
+            A = QuesDic.pop(Q)
+            await client.send_message(message.channel, 'それではスタート')
+            await client.send_message(message.channel, '問題です {}'.format(Q))
+        if not CmdFlag: await OptionError(message, cmd)
+    elif message.content.startswith(prefix+'ans') and QuesFlag:
+        cmd = message.content.split()
+        if '--exit' in cmd:
+            await client.send_message(message.channel, '終わります')
+            QuesFlag = False
+            QuesDic = []
+        else:
+            ans = CmdSpliter(cmd, 1)
+            if ans == A: await client.send_message(message.channel, '正解！')
+            else: await client.send_message(message.channel, 'は、こんなんも分からんのか')
+            try:
+                Q = choice(list(QuesDic.keys()))
+                A = QuesDic.pop(Q)
+                await client.send_message(message.channel, 'はい、次')
+                await client.send_message(message.channel, '張り切ってどうぞ\n{}'.format(Q))
+            except:
+                await client.send_message(message.channel, 'しゅーりょー')
+                QuesFlag = False
+                QuesDic = []
     elif message.content.startswith(prefix+'version'):
         await log.Log(version)
         await client.send_message(message.channel, version)

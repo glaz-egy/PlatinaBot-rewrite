@@ -17,6 +17,7 @@ CommandDictJP = {'help': OrderedDict(),
 CommandDictJP['help'] = { '`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
                         '`'+prefix+'music`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
                         '`'+prefix+'spell`': '呪文を唱えるコマンド `{}help spell`で確認できます'.format(prefix),
+                        '`'+prefix+'study`': '勉強用のコマンド `{}help study`で確認できます'.format(prefix),
                         '`'+prefix+'say SayText`': 'ボットがSayTextの内容を発言します それだけのコマンド',
                         '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします',
                         '`'+prefix+'version`': '現在のバージョンを確認できる',
@@ -59,6 +60,17 @@ CommandDictJP['spell'] = {'`'+prefix+'spell option`': '`呪文用のコマンド
                         '`--add SpellName Spelltext [Spelltext]...`': '呪文を追加します 呪文名 につづけて 一節ずつスペースを空けて入力してください',
                         '`--add-line SpellName`': '呪文を追加します 呪文名 と一緒に入力した後 一節ずつ入力してください',
                         '`--del SpellName`': '呪文を削除します'}
+
+CommandDictJP['study'] = {'`'+prefix+'study`': '勉強用のコマンド',
+                        '`--list-subject`': '科目を確認します',
+                        '`--list-unit Subject`': '単元を確認します',
+                        '`--list-ques Subject Unit`': '問題を確認します',
+                        '`--add Subject Unit Ques Ans`': '一つ問題を追加します',
+                        '`--add-m Subject Unit Ques;Ans [Ques;Ans]...`': '複数入力することが出来ます',
+                        '`--del DelKey DelText`': 'DelKeyには[Subject, Unit, Ques]のいずれかを選び、削除したい項目を選んでください',
+                        '`--start Subject Unit`': '問題の出題を開始します',
+                        '`'+prefix+'ans Anwser`': '答えを入力します',
+                        '`'+prefix+'ans --exit`': '出題を中断します'}
 
 CommandDictEN = OrderedDict()
 CommandDictEN = {'help': OrderedDict(),
