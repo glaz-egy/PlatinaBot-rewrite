@@ -914,33 +914,6 @@ async def on_message(message):
             await client.send_message(message.channel, 'それではスタート')
             await client.send_message(message.channel, '問題です {}'.format(Q))
         if not CmdFlag: await OptionError(message, cmd)
-    elif (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)) and QuesFlag:
-        cmd = message.content.split()
-        if '--exit' in cmd:
-            await client.send_message(message.channel, '終わります')
-            QuesFlag = False
-            QuesDic = []
-        else:
-            ans = CmdSpliter(cmd, 1)
-            if ans == A: await client.send_message(message.channel, '正解！')
-            else:
-                await client.send_message(message.channel, 'は、こんなんも分からんのか\n もう一回やって')
-                return 
-            try:
-                Q = choice(list(QuesDic.keys()))
-                A = QuesDic.pop(Q)
-                await client.send_message(message.channel, 'はい、次')
-                await client.send_message(message.channel, '張り切ってどうぞ\n{}'.format(Q))
-            except:
-                await client.send_message(message.channel, 'しゅーりょー')
-                QuesFlag = False
-                QuesDic = []
-    elif message.content.startswith(prefix+'version'):
-        await log.Log(version)
-        await client.send_message(message.channel, version)
-        if IbotFlag:
-            await log.Log(InteractiveBot.__version__)
-            await client.send_message(message.channel, InteractiveBot.__version__)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
@@ -952,6 +925,36 @@ async def on_message(message):
             await sys.exit(0)
         else:
             PermissionErrorFunc(message)
+    elif (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)) and QuesFlag:
+        cmd = message.content.split()
+        if '--exit' in cmd:
+            await client.send_message(message.channel, '終わります')
+            QuesFlag = False
+            QuesDic = []
+            return
+        elif '--next' in cmd:
+            await client.send_message(message.channel, '正解は{}でしたー'.format(A))
+        else:
+            ans = CmdSpliter(cmd, 1 if message.content.startswith(prefix+'ans') else 0)
+            if ans == A: await client.send_message(message.channel, '正解！')
+            else:
+                await client.send_message(message.channel, 'は、こんなんも分からんのか\nもう一回やって')
+                return 
+        try:
+            Q = choice(list(QuesDic.keys()))
+            A = QuesDic.pop(Q)
+            await client.send_message(message.channel, 'はい、次')
+            await client.send_message(message.channel, '張り切ってどうぞ\n{}'.format(Q))
+        except:
+            await client.send_message(message.channel, 'しゅーりょー')
+            QuesFlag = False
+            QuesDic = []
+    elif message.content.startswith(prefix+'version'):
+        await log.Log(version)
+        await client.send_message(message.channel, version)
+        if IbotFlag:
+            await log.Log(InteractiveBot.__version__)
+            await client.send_message(message.channel, InteractiveBot.__version__)
     elif message.content.startswith(prefix+'debug'):
         await client.send_message(message.channel, client.email)
     elif message.content.startswith(prefix+'say'):

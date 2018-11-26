@@ -69,7 +69,8 @@ CommandDictJP['study'] = {'`'+prefix+'study`': '勉強用のコマンド',
                         '`--add-m Subject Unit Ques;Ans [Ques;Ans]...`': '複数入力することが出来ます',
                         '`--del DelKey DelText`': 'DelKeyには[Subject, Unit, Ques]のいずれかを選び、削除したい項目を選んでください',
                         '`--start Subject Unit [Unit]...`': '問題の出題を開始します',
-                        '`'+prefix+'ans Anwser`': '答えを入力します',
+                        '`'+prefix+'ans Anwser`': '答えを入力します 専用チャンネルでは`Anwser`だけでも回答可能です',
+                        '`'+prefix+'ans --next`': '解答を出力して次の問題へ移ります',
                         '`'+prefix+'ans --exit`': '出題を中断します'}
 
 CommandDictEN = OrderedDict()
