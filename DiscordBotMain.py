@@ -897,10 +897,10 @@ async def on_message(message):
             for QuesAns in cmd[index+1:]:
                 try:
                     Ques, Ans = QuesAns.split(';')
+                    Qs.append(Ques)
+                    As.append(Ans)
                 except:
                     await client.send_message(message.channel, '入力の形式が違います')
-                Qs.append(Ques)
-                As.append(Ans)
             Study.AddStudy(Subject, Unit, Qs, As)
         elif '--start' in cmd:
             CmdFlag = True
