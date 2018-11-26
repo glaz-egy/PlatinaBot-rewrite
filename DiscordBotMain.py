@@ -914,7 +914,7 @@ async def on_message(message):
             await client.send_message(message.channel, 'それではスタート')
             await client.send_message(message.channel, '問題です {}'.format(Q))
         if not CmdFlag: await OptionError(message, cmd)
-    elif (message.content.startswith(prefix+'ans') or message.channel.id == config['BOTDATA']['studych']) and QuesFlag:
+    elif (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)) and QuesFlag:
         cmd = message.content.split()
         if '--exit' in cmd:
             await client.send_message(message.channel, '終わります')
