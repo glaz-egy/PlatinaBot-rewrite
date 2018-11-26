@@ -68,7 +68,7 @@ CommandDictJP['study'] = {'`'+prefix+'study`': '勉強用のコマンド',
                         '`--add Subject Unit Ques Ans`': '一つ問題を追加します',
                         '`--add-m Subject Unit Ques;Ans [Ques;Ans]...`': '複数入力することが出来ます',
                         '`--del DelKey DelText`': 'DelKeyには[Subject, Unit, Ques]のいずれかを選び、削除したい項目を選んでください',
-                        '`--start Subject Unit`': '問題の出題を開始します',
+                        '`--start Subject Unit [Unit]...`': '問題の出題を開始します',
                         '`'+prefix+'ans Anwser`': '答えを入力します',
                         '`'+prefix+'ans --exit`': '出題を中断します'}
 

@@ -914,7 +914,7 @@ async def on_message(message):
             await client.send_message(message.channel, 'それではスタート')
             await client.send_message(message.channel, '問題です {}'.format(Q))
         if not CmdFlag: await OptionError(message, cmd)
-    elif message.content.startswith(prefix+'ans') and QuesFlag:
+    elif (message.content.startswith(prefix+'ans') or message.channel.id == config['BOTDATA']['studych']) and QuesFlag:
         cmd = message.content.split()
         if '--exit' in cmd:
             await client.send_message(message.channel, '終わります')
@@ -923,7 +923,9 @@ async def on_message(message):
         else:
             ans = CmdSpliter(cmd, 1)
             if ans == A: await client.send_message(message.channel, '正解！')
-            else: await client.send_message(message.channel, 'は、こんなんも分からんのか')
+            else:
+                await client.send_message(message.channel, 'は、こんなんも分からんのか\n もう一回やって')
+                return 
             try:
                 Q = choice(list(QuesDic.keys()))
                 A = QuesDic.pop(Q)
