@@ -877,8 +877,17 @@ async def on_message(message):
             CmdFlag = True
             delkey = cmd[cmd.index('--del')+1]
             DelObj = cmd[cmd.index('--del')+2]
-            Study.DelStudy(DelObj, delkey)
-            await client.send_message(message.channel, '問題を削除します')
+            backunm = Study.DelStudy(DelObj, delkey)
+            if backunm == 0:
+                await client.send_message(message.channel, '問題を削除します')
+            elif backunm == -1:
+                await client.send_message(message.channel, 'Question名: {} は見つかりませんでした'.format(DelObj))
+            elif backunm == -2:
+                await client.send_message(message.channel, 'Unit名: {} は見つかりませんでした'.format(DelObj))
+            elif backunm == -3:
+                await client.send_message(message.channel, 'Subject名: {} は見つかりませんでした'.format(DelObj))
+            elif backunm == -3:
+                await client.send_message(message.channel, 'DelKeyの指定が間違っています')
         elif '--add' in cmd:
             CmdFlag = True
             Subject, index = CmdSpliter(cmd, cmd.index('--add')+1, sufIndex=True)
@@ -905,12 +914,18 @@ async def on_message(message):
         elif '--start' in cmd:
             CmdFlag = True
             Subject, index = CmdSpliter(cmd, cmd.index('--start')+1, sufIndex=True)
-            Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
-            if not cmd[index+1:] == []:
-                QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
-                for unit in cmd[index+1:]:
+            if index+1 >= len(cmd):
+                UnitList = Study.StudyDic[Subject].keys()
+                QuesDic = {}
+                for unit in UnitList:
                     QuesDic.update(deepcopy(Study.StudyDic[Subject][unit]))
-            else: QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
+            else:
+                Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
+                if not cmd[index+1:] == []:
+                    QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
+                    for unit in cmd[index+1:]:
+                        QuesDic.update(deepcopy(Study.StudyDic[Subject][unit]))
+                else: QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
             QuesFlag = True
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
