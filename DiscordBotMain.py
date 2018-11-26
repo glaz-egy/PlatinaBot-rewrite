@@ -895,7 +895,10 @@ async def on_message(message):
             Subject, index = CmdSpliter(cmd, cmd.index('--add-m')+1, sufIndex=True)
             Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
             for QuesAns in cmd[index+1:]:
-                Ques, Ans = QuesAns.split(';')
+                try:
+                    Ques, Ans = QuesAns.split(';')
+                except:
+                    await client.send_message(message.channel, '入力の形式が違います')
                 Qs.append(Ques)
                 As.append(Ans)
             Study.AddStudy(Subject, Unit, Qs, As)
