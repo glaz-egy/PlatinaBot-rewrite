@@ -19,6 +19,7 @@ import sched
 import time
 import sys
 import os
+import re
 
 class LogControl:
     def __init__(self, FileName):
@@ -954,7 +955,7 @@ async def on_message(message):
             await client.send_message(message.channel, '正解は{}でしたー'.format(A))
         else:
             ans = CmdSpliter(cmd, 1 if message.content.startswith(prefix+'ans') else 0)
-            if ans == A: await client.send_message(message.channel, '正解！')
+            if re.match(A, ans): await client.send_message(message.channel, '正解！')
             else:
                 await client.send_message(message.channel, 'は、こんなんも分からんのか\nもう一回やって')
                 return 
