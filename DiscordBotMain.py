@@ -944,7 +944,7 @@ async def on_message(message):
             await sys.exit(0)
         else:
             PermissionErrorFunc(message)
-    elif (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)) and QuesFlag:
+    elif QuesFlag and (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)):
         cmd = message.content.split()
         if '--exit' in cmd:
             await client.send_message(message.channel, '終わります')
