@@ -915,6 +915,7 @@ async def on_message(message):
                     await client.send_message(message.channel, '入力の形式が違います')
             Study.AddStudy(Subject, Unit, Qs, As)
         elif '--score' in cmd:
+            CmdFlag = True
             tmpvalue = 0
             await client.send_message(message.channel, '前回の成績')
             try:
@@ -962,7 +963,8 @@ async def on_message(message):
             PermissionErrorFunc(message)
     elif QuesFlag and (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)):
         cmd = message.content.split()
-        AnsUserDic[message.author.name] = 0
+        if not message.author.neme in AnsUserDic.keys():
+            AnsUserDic[message.author.name] = 0
         if '--exit' in cmd:
             await client.send_message(message.channel, '終わります')
             QuesFlag = False
