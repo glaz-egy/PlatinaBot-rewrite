@@ -928,10 +928,11 @@ async def on_message(message):
                         QuesDic.update(deepcopy(Study.StudyDic[Subject][unit]))
                 else: QuesDic = deepcopy(Study.StudyDic[Subject][Unit])
             QuesFlag = True
+            QuesLen = len(QuesDic)
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
             await client.send_message(message.channel, 'それではスタート')
-            await client.send_message(message.channel, '問題です {}'.format(Q))
+            await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic), QuesLen, Q))
         if not CmdFlag: await OptionError(message, cmd)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
@@ -963,7 +964,7 @@ async def on_message(message):
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
             await client.send_message(message.channel, 'はい、次')
-            await client.send_message(message.channel, '張り切ってどうぞ\n{}'.format(Q))
+            await client.send_message(message.channel, '張り切ってどうぞ\n残り{}/全問{}\n{}'.format(len(QuesDic), QuesLen, Q))
         except:
             await client.send_message(message.channel, 'しゅーりょー')
             QuesFlag = False
