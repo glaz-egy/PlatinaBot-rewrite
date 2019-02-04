@@ -340,6 +340,18 @@ async def NotArgsment(message):
     await client.send_message(message.channel, 'オプションに引数が無いよ！')
     await log.ErrorLog('Not argment')
 
+async def ScoreOut(message):
+    global AnsUserDic
+    try:
+        for key, value in AnsUserDic.items():
+            await client.send_message(message.channel, '{}:{}問正解'.format(key, value))
+            if value > tmpvalue:
+                tmpvalue = value
+                tmpuser = key
+        await client.send_message(message.channel, '成績優秀者は{}でした'.format(tmpuser))
+    except:
+        await client.send_message(message.channel, '成績がありません')
+
 @client.event
 async def on_ready():
     await log.Log('Bot is Logging in!!')
@@ -918,15 +930,7 @@ async def on_message(message):
             CmdFlag = True
             tmpvalue = 0
             await client.send_message(message.channel, '前回の成績')
-            try:
-                for key, value in AnsUserDic.items():
-                    await client.send_message(message.channel, '{}:{}問正解'.format(key, value))
-                    if value > tmpvalue:
-                        tmpvalue = value
-                        tmpuser = key
-                await client.send_message(message.channel, '成績優秀者は{}でした'.format(tmpuser))
-            except:
-                await client.send_message(message.channel, '成績がありません')
+            await ScoreOut(message)
         elif '--start' in cmd:
             CmdFlag = True
             Subject, index = CmdSpliter(cmd, cmd.index('--start')+1, sufIndex=True)
@@ -988,6 +992,8 @@ async def on_message(message):
             await client.send_message(message.channel, '残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
         except:
             await client.send_message(message.channel, 'しゅーりょー')
+            await client.send_message(message.channel, '成績')
+            await ScoreOut(message)
             QuesFlag = False
             QuesDic = []
     elif message.content.startswith(prefix+'version'):
