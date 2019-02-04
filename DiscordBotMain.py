@@ -923,7 +923,7 @@ async def on_message(message):
                     await client.send_message(message.channel, '{}:{}問正解'.format(key, value))
                     if value > tmpvalue:
                         tmpvalue = value
-                        tmpuser = Key
+                        tmpuser = key
                 await client.send_message(message.channel, '成績優秀者は{}でした'.format(tmpuser))
             except:
                 await client.send_message(message.channel, '成績がありません')
