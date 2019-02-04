@@ -245,7 +245,6 @@ async def NextSet(message):
     global NowPlayList
     global player
     global PlayURLs
-    global QuesLen
     if not RandomFlag: NowPlay = 0
     else:
         if not len(PlayURLs) == 0: NowPlay = randint(0, len(PlayURLs)-1)
@@ -350,7 +349,7 @@ async def on_message(message):
     global NowPlayList, PlayURLs, RandomFlag
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
-    global QuesDic, QuesFlag, Q, A
+    global QuesDic, QuesFlag, Q, A, QuesLen
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
@@ -967,7 +966,7 @@ async def on_message(message):
             A = QuesDic.pop(Q)
             await client.send_message(message.channel, 'はい、次')
             await client.send_message(message.channel, '張り切ってどうぞ')
-            await client.send_message(message.channel, '残り{}/全問{}\n{}'.format(len(QuesDic)+1, 10, Q))
+            await client.send_message(message.channel, '残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
         except:
             await client.send_message(message.channel, 'しゅーりょー')
             QuesFlag = False
