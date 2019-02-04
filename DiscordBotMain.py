@@ -196,6 +196,7 @@ player = None
 InteractiveBot = None
 QuesLen = 0
 PlayListFiles = {}
+AnsUserDic = {}
 PlayListName = []
 NextList = []
 SpellDataG = []
@@ -349,7 +350,7 @@ async def on_message(message):
     global NowPlayList, PlayURLs, RandomFlag
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
-    global QuesDic, QuesFlag, Q, A, QuesLen
+    global QuesDic, QuesFlag, Q, A, QuesLen, AnsUserDic
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
@@ -913,6 +914,18 @@ async def on_message(message):
                 except:
                     await client.send_message(message.channel, '入力の形式が違います')
             Study.AddStudy(Subject, Unit, Qs, As)
+        elif '--score' in cmd:
+            tmpvalue = 0
+            await client.send_message(message.channel, '前回の成績')
+            try:
+                for key, value in AnsUserDic.items():
+                    await client.send_message(message.channel, '{}:{}問正解'.format(key, value))
+                    if value > tmpvalue:
+                        tmpvalue = value
+                        tmpuser = Key
+                await client.send_message(message.channel, '成績優秀者は{}でした'.format(tmpuser))
+            except:
+                await client.send_message(message.channel, '成績がありません')
         elif '--start' in cmd:
             CmdFlag = True
             Subject, index = CmdSpliter(cmd, cmd.index('--start')+1, sufIndex=True)
@@ -932,6 +945,7 @@ async def on_message(message):
             QuesLen = len(QuesDic)
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
+            AnsUserDic = {}
             await client.send_message(message.channel, 'それではスタート')
             await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic)+1, QuesLen, Q))
         if not CmdFlag: await OptionError(message, cmd)
@@ -948,6 +962,7 @@ async def on_message(message):
             PermissionErrorFunc(message)
     elif QuesFlag and (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)):
         cmd = message.content.split()
+        AnsUserDic[message.author.name] = 0
         if '--exit' in cmd:
             await client.send_message(message.channel, '終わります')
             QuesFlag = False
@@ -957,7 +972,9 @@ async def on_message(message):
             await client.send_message(message.channel, '正解は{}でしたー'.format(A))
         else:
             ans = CmdSpliter(cmd, 1 if message.content.startswith(prefix+'ans') else 0)
-            if re.match(A, ans): await client.send_message(message.channel, '正解！')
+            if re.match(A, ans):
+                await client.send_message(message.channel, '正解！')
+                AnsUserDic[message.author.name] += 1
             else:
                 await client.send_message(message.channel, 'は、こんなんも分からんのか\nもう一回やって')
                 return 
