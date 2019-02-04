@@ -966,7 +966,8 @@ async def on_message(message):
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
             await client.send_message(message.channel, 'はい、次')
-            await client.send_message(message.channel, '張り切ってどうぞ\n残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
+            await client.send_message(message.channel, '張り切ってどうぞ')
+            await client.send_message(message.channel, '残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
         except:
             await client.send_message(message.channel, 'しゅーりょー')
             QuesFlag = False
