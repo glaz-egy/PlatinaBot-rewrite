@@ -194,6 +194,7 @@ def ArgsInit():
 MusicMessage = None
 player = None
 InteractiveBot = None
+QuesLen = 0
 PlayListFiles = {}
 PlayListName = []
 NextList = []
@@ -244,6 +245,7 @@ async def NextSet(message):
     global NowPlayList
     global player
     global PlayURLs
+    global QuesLen
     if not RandomFlag: NowPlay = 0
     else:
         if not len(PlayURLs) == 0: NowPlay = randint(0, len(PlayURLs)-1)
@@ -932,7 +934,7 @@ async def on_message(message):
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
             await client.send_message(message.channel, 'それではスタート')
-            await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic), QuesLen, Q))
+            await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic)+1, QuesLen, Q))
         if not CmdFlag: await OptionError(message, cmd)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
@@ -964,7 +966,7 @@ async def on_message(message):
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
             await client.send_message(message.channel, 'はい、次')
-            await client.send_message(message.channel, '張り切ってどうぞ\n残り{}/全問{}\n{}'.format(len(QuesDic), QuesLen, Q))
+            await client.send_message(message.channel, '張り切ってどうぞ\n残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
         except:
             await client.send_message(message.channel, 'しゅーりょー')
             QuesFlag = False
