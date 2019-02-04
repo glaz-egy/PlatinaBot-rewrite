@@ -963,7 +963,7 @@ async def on_message(message):
             PermissionErrorFunc(message)
     elif QuesFlag and (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)):
         cmd = message.content.split()
-        if not message.author.neme in AnsUserDic.keys():
+        if not message.author.neme in AnsUserDic:
             AnsUserDic[message.author.name] = 0
         if '--exit' in cmd:
             await client.send_message(message.channel, '終わります')
