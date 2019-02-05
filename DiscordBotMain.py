@@ -892,7 +892,10 @@ async def on_message(message):
         elif '--del' in cmd:
             CmdFlag = True
             DelKey = cmd[cmd.index('--del')+1]
-            DelObj = cmd[cmd.index('--del')+2]
+            if DelKey == 'Ques':
+                DelObj = cmd[cmd.index('--del')+2]
+                DelObj.append(cmd[cmd.index('--del')+3])
+                DelObj.append(cmd[cmd.index('--del')+4])
             backunm = Study.DelStudy(DelObj, DelKey)
             if backunm == 0:
                 await client.send_message(message.channel, '問題を削除します')
