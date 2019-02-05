@@ -912,12 +912,16 @@ async def on_message(message):
         elif '--add' in cmd:
             CmdFlag = True
             Subject, index = CmdSpliter(cmd, cmd.index('--add')+1, sufIndex=True)
-            Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
-            Ques, index = CmdSpliter(cmd, index+1, sufIndex=True)
-            Ans, index = CmdSpliter(cmd, index+1, sufIndex=True)
-            Study.AddStudy(Subject, Unit, [Ques,], [Ans,])
-            await log.Log("Unit:{} Ques:{} - ans:{}".format(Unit, Ques, Ans))
-            await client.send_message(message.channel, '問題を追加します')
+            try:
+                Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
+                Ques, index = CmdSpliter(cmd, index+1, sufIndex=True)
+                Ans, index = CmdSpliter(cmd, index+1, sufIndex=True)
+                Study.AddStudy(Subject, Unit, [Ques,], [Ans,])
+                await log.Log("Unit:{} Ques:{} - ans:{}".format(Unit, Ques, Ans))
+                await client.send_message(message.channel, '問題を追加します')
+            except:
+                await log.ErrorLog("Input ques and ans is wrong type")
+                await client.send_message(message.channel, '入力の形式が違います')
         elif '--add-m' in cmd:
             CmdFlag = True
             Qs = []
