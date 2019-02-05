@@ -893,7 +893,7 @@ async def on_message(message):
             CmdFlag = True
             DelKey = cmd[cmd.index('--del')+1]
             if DelKey == 'Ques':
-                DelObj = cmd[cmd.index('--del')+2]
+                DelObj = [cmd[cmd.index('--del')+2]]
                 DelObj.append(cmd[cmd.index('--del')+3])
                 DelObj.append(cmd[cmd.index('--del')+4])
             backunm = Study.DelStudy(DelObj, DelKey)
