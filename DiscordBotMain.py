@@ -891,18 +891,23 @@ async def on_message(message):
             return
         elif '--del' in cmd:
             CmdFlag = True
-            delkey = cmd[cmd.index('--del')+1]
+            DelKey = cmd[cmd.index('--del')+1]
             DelObj = cmd[cmd.index('--del')+2]
-            backunm = Study.DelStudy(DelObj, delkey)
+            backunm = Study.DelStudy(DelObj, DelKey)
             if backunm == 0:
                 await client.send_message(message.channel, '問題を削除します')
+                await log.Log("Delete {}: {}".format(DelKey, DelObj))
             elif backunm == -1:
+                await log.ErrorLog("Question:{} is wrong".format(DelObj))
                 await client.send_message(message.channel, 'Question名: {} は見つかりませんでした'.format(DelObj))
             elif backunm == -2:
+                await log.ErrorLog("Unit:{} is wrong".format(DelObj))
                 await client.send_message(message.channel, 'Unit名: {} は見つかりませんでした'.format(DelObj))
             elif backunm == -3:
+                await log.ErrorLog("Subject:{} is wrong".format(DelObj))
                 await client.send_message(message.channel, 'Subject名: {} は見つかりませんでした'.format(DelObj))
-            elif backunm == -3:
+            elif backunm == -4:
+                await log.ErrorLog("DelKey:{} is wrong".format(DelKey))
                 await client.send_message(message.channel, 'DelKeyの指定が間違っています')
         elif '--add' in cmd:
             CmdFlag = True
@@ -911,6 +916,7 @@ async def on_message(message):
             Ques, index = CmdSpliter(cmd, index+1, sufIndex=True)
             Ans, index = CmdSpliter(cmd, index+1, sufIndex=True)
             Study.AddStudy(Subject, Unit, [Ques,], [Ans,])
+            await log.Log("Unit:{} Ques:{} - ans:{}".format(Unit, Ques, Ans))
             await client.send_message(message.channel, '問題を追加します')
         elif '--add-m' in cmd:
             CmdFlag = True
@@ -924,12 +930,13 @@ async def on_message(message):
                     Ques, Ans = QuesAns.split(';')
                     Qs.append(Ques)
                     As.append(Ans)
+                    await log.Log("Unit:{} Ques:{} - ans:{}".format(Unit, Ques, Ans))
                 except:
+                    await log.ErrorLog("[{}] is wrong type".format(QuesAns))
                     await client.send_message(message.channel, '入力の形式が違います')
             Study.AddStudy(Subject, Unit, Qs, As)
         elif '--score' in cmd:
             CmdFlag = True
-            tmpvalue = 0
             await client.send_message(message.channel, '前回の成績')
             await ScoreOut(message)
         elif '--start' in cmd:
