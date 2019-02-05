@@ -342,6 +342,7 @@ async def NotArgsment(message):
 
 async def ScoreOut(message):
     global AnsUserDic
+    tmpvalue = 0
     try:
         for key, value in AnsUserDic.items():
             await client.send_message(message.channel, '{}:{}問正解'.format(key, value))
