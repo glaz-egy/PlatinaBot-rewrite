@@ -209,6 +209,7 @@ TitleFlag = True
 SpellInput = False
 QuesDic = {}
 QuesFlag = False
+LockFlag = False
 Q = ''
 A = ''
 version = '''PlatinaBot version: 2.3.5
@@ -364,6 +365,7 @@ async def on_message(message):
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
     global QuesDic, QuesFlag, Q, A, QuesLen, AnsUserDic
+    global LockFlag
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
@@ -996,12 +998,15 @@ async def on_message(message):
             if message.content.startswith(prefix+'ans'): ans = CmdSpliter(cmd, 1)
             else: ans = message.content
             await log.Log('Input {}'.format(ans))
-            if re.match(A, ans):
-                await client.send_message(message.channel, '正解！')
-                AnsUserDic[message.author.name] += 1
-            else:
-                await client.send_message(message.channel, 'は、こんなんも分からんのか\nもう一回やって')
-                return 
+            if not LockFlag:
+                if re.match(A, ans):
+                    LockFlag = True
+                    await client.send_message(message.channel, '正解！')
+                    AnsUserDic[message.author.name] += 1
+                else:
+                    await client.send_message(message.channel, 'は、こんなんも分からんのか\nもう一回やって')
+                    return 
+            else: return
         try:
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
@@ -1014,6 +1019,7 @@ async def on_message(message):
             await ScoreOut(message)
             QuesFlag = False
             QuesDic = []
+        LockFlag = False
     elif message.content.startswith(prefix+'version'):
         await log.Log(version)
         await client.send_message(message.channel, version)
