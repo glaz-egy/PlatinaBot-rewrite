@@ -321,7 +321,7 @@ def CmdSpliter(cmd, index, sufIndex=False):
         tempStr = cmd[index]
         while Flag:
             index += 1
-            tempStr = ' ' + cmd[index]
+            tempStr += ' ' + cmd[index]
             if '"' in cmd[index]: break
         SplitStr = tempStr.replace('"', '').strip()
     else: SplitStr = cmd[index]
@@ -993,7 +993,9 @@ async def on_message(message):
         elif '--next' in cmd:
             await client.send_message(message.channel, '正解は{}でしたー'.format(A))
         else:
-            ans = CmdSpliter(cmd, 1 if message.content.startswith(prefix+'ans') else 0)
+            if message.content.startswith(prefix+'ans'): ans = CmdSpliter(cmd, 1)
+            else: ans = message.content
+            await log.Log('Input {}'.format(ans))
             if re.match(A, ans):
                 await client.send_message(message.channel, '正解！')
                 AnsUserDic[message.author.name] += 1
