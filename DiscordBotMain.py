@@ -209,6 +209,7 @@ TitleFlag = True
 SpellInput = False
 QuesDic = {}
 QuesFlag = False
+LockFlag = False
 Q = ''
 A = ''
 version = '''PlatinaBot version: 2.3.5
@@ -997,9 +998,9 @@ async def on_message(message):
             if message.content.startswith(prefix+'ans'): ans = CmdSpliter(cmd, 1)
             else: ans = message.content
             await log.Log('Input {}'.format(ans))
-            if LockFlag == true:
+            if not LockFlag:
                 if re.match(A, ans):
-                    LockFlag = true
+                    LockFlag = True
                     await client.send_message(message.channel, '正解！')
                     AnsUserDic[message.author.name] += 1
                 else:
@@ -1018,7 +1019,7 @@ async def on_message(message):
             await ScoreOut(message)
             QuesFlag = False
             QuesDic = []
-        LockFlag = false
+        LockFlag = False
     elif message.content.startswith(prefix+'version'):
         await log.Log(version)
         await client.send_message(message.channel, version)
