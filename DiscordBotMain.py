@@ -15,6 +15,7 @@ import hashlib
 import asyncio
 import pickle
 import signal
+import books
 import sched
 import time
 import sys
@@ -189,6 +190,7 @@ def ArgsInit():
     parser.add_argument('--config', default='config.ini')
     parser.add_argument('--spell', default='Spelldata.sp')
     parser.add_argument('--study', default='Studydata.sf')
+    parser.add_argument('--book', default='bookfile.bf')
     return parser.parse_args()
 
 MusicMessage = None
@@ -229,10 +231,13 @@ if os.path.isfile(args.playlist): PlayListFiles = LoadPlaylist(FileName=args.pla
 else:
     PlayListFiles['default'] = {}
     SavePlaylist(PlayListFiles, FileName=args.playlist)
-    PlayListFiles = LoadPlaylist(FileName=args.playlist)
 NowPlayList = 'default'
 PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
+if os.path.isfile(args.book): BooksData = books.LoadBooksData(args.book)
+else:
+    BooksData = {}
+    books.SaveBooksData(args.book, BooksData)
 maindir = os.getcwd()
 
 Spell = retain.spell.Spell(args.spell)
@@ -365,7 +370,7 @@ async def on_message(message):
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
     global QuesDic, QuesFlag, Q, A, QuesLen, AnsUserDic
-    global LockFlag
+    global LockFlag, BooksData
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
@@ -672,8 +677,8 @@ async def on_message(message):
             if '-r' in cmd: RandomFlag = True
             if PauseFlag: await player.resume(message)
             else:
-                if not len(PlayURLs) == 1: music = randint(0, len(PlayURLs)-1)
-                elif not len(PlayURLs) == 0: music = 0
+                if len(PlayURLs) >= 1: music = randint(0, len(PlayURLs)-1)
+                elif len(PlayURLs) == 0: music = 0
                 else:
                     await client.send_message(message.channle, 'プレイリストに曲が入ってないよ！')
                     await log.ErrorLog('Not music in playlist')
@@ -972,6 +977,60 @@ async def on_message(message):
             await client.send_message(message.channel, 'それではスタート')
             await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic)+1, QuesLen, Q))
         if not CmdFlag: await OptionError(message, cmd)
+    elif message.content.startswith(prefix+'book'):
+        cmd = message.content.split()[1:]
+        if cmd[0] == '--add':
+            if cmd[1] in BooksData.keys():
+                await client.send_message(message.channel, 'すでに書籍が登録してあります。別の名前で登録してください')
+            else:
+                BooksData[cmd[1]] = books.BookData(cmd[1], cmd[2], cmd[3])
+                books.SaveBooksData(args.book, BooksData)
+                await client.send_message(message.channel, '書籍の登録が完了しました')
+        elif cmd[0] == '--del':
+            if not cmd[1] in BooksData.keys():
+                await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
+            else:
+                del BooksData[cmd[1]]
+                books.SaveBooksData(args.book, BooksData)
+                await client.send_message(message.channel, '書籍の削除が完了しました')
+        elif cmd[0] == '--borrow':
+            if not cmd[1] in BooksData.keys():
+                await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
+                return
+            status = BooksData[cmd[1]].LendingBook(message.author.name, message.author.id)
+            if status == 0:
+                await client.send_message(message.channel, '正常に貸出処理が完了しました')
+            elif status == -1:
+                await client.send_message(message.channel, '只今貸出中です。返却処理が終わってから再度貸出処理を行ってください')
+            books.SaveBooksData(args.book, BooksData)
+        elif cmd[0] == '--return':
+            if not cmd[1] in BooksData.keys():
+                await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
+                return
+            status = BooksData[cmd[1]].ReturnBook(message.author.name, message.author.id)
+            if status == 0:
+                await client.send_message(message.channel, '正常に返却処理が完了しました')
+            elif status == -1:
+                await client.send_message(message.channel, '貸出処理が行われていません。貸出処理を行ってから返却処理を行ってください')
+            elif status == -10:
+                await client.send_message(message.channel, '貸出ユーザとIDが違います。返却処理は本人が行ってください')
+            books.SaveBooksData(args.book, BooksData)
+        elif cmd[0] == '--list':
+            listbook = ''
+            outFlag = False
+            for key in BooksData.keys():
+                datalist = BooksData[key].GetBookInfo(data = (None if (len(cmd) == 1) else cmd[1]))
+                if len(datalist) == 2:
+                    listbook += datalist[0] + ': ' + ('貸出中' if datalist[1] else '貸出可')+'\n'
+                elif len(datalist) == 3:
+                    listbook += datalist[0] + ': ' + ('N/A' if datalist[1] is None else datalist[1]) + ': '+ ('貸出中' if datalist[2] else '貸出可')+'\n'
+                if len(listbook) > 750:
+                    if len(cmd) == 1:
+                        await EmbedOut(message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
+                    listbook = ''
+                    outFlag = True
+            if not outFlag:
+                await EmbedOut(message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
