@@ -9,6 +9,7 @@ from youtube_dl import YoutubeDL
 from retainBot import retain
 from copy import deepcopy
 from glob import glob
+from function import *
 import threading
 import discord
 import hashlib
@@ -171,27 +172,9 @@ class MusicPlayer:
         if not state.is_playing():
             await self.bot.send_message(message.channel, 'Not playing any music right now...')
             return
-
         state.skip()
 
-def SavePlaylist(PLdata, FileName='playlist.plf'):
-    with open(FileName, 'wb') as f:
-        pickle.dump(PLdata, f)
 
-def LoadPlaylist(FileName='playlist.plf'):
-    with open(FileName, 'rb') as f:
-        PLdata = pickle.load(f)
-    return PLdata
-
-def ArgsInit():
-    parser = ArgumentParser(description='Playlist, log and config set args')
-    parser.add_argument('--playlist', default='playlist.plf')
-    parser.add_argument('--log', default='bot.log')
-    parser.add_argument('--config', default='config.ini')
-    parser.add_argument('--spell', default='Spelldata.sp')
-    parser.add_argument('--study', default='Studydata.sf')
-    parser.add_argument('--book', default='bookfile.bf')
-    return parser.parse_args()
 
 MusicMessage = None
 player = None
@@ -227,17 +210,17 @@ prefix = config['BOTDATA']['cmdprefix']
 with open('help.dat', 'rb') as f:
     Data = pickle.load(f)
     CommandDict = Data['JP']
-if os.path.isfile(args.playlist): PlayListFiles = LoadPlaylist(FileName=args.playlist)
+if os.path.isfile(args.playlist): PlayListFiles = LoadBinData(FileName=args.playlist)
 else:
     PlayListFiles['default'] = {}
-    SavePlaylist(PlayListFiles, FileName=args.playlist)
+    SaveBinData(PlayListFiles, FileName=args.playlist)
 NowPlayList = 'default'
 PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
-if os.path.isfile(args.book): BooksData = books.LoadBooksData(args.book)
+if os.path.isfile(args.book): BooksData = LoadBinData(args.book)
 else:
     BooksData = {}
-    books.SaveBooksData(args.book, BooksData)
+    SaveBinData(args.book, BooksData)
 maindir = os.getcwd()
 
 Spell = retain.spell.Spell(args.spell)
@@ -247,21 +230,6 @@ Cal = Calendar(client)
 
 TrueORFalse = {'Enable': True,
                 'Disable': False}
-
-async def NextSet(message):
-    global NowPlayList
-    global player
-    global PlayURLs
-    if not RandomFlag: NowPlay = 0
-    else:
-        if not len(PlayURLs) == 0: NowPlay = randint(0, len(PlayURLs)-1)
-        else: NowPlay = 0
-    song = PlayURLs[NowPlay]
-    await player.play(message, song=('https://www.youtube.com/watch?v='+ song if not 'http' in song else song))
-    await log.MusicLog('Set {}'.format(PlayURLs[NowPlay]))
-    PlayURLs.remove(PlayURLs[NowPlay])
-    if len(PlayURLs) == 0:
-        PlayURLs = list(PlayListFiles[NowPlayList].keys())
 
 async def ListOut(message, all=False, List=False):
     global NowPlayList
@@ -282,10 +250,10 @@ async def ListOut(message, all=False, List=False):
                     URLs[-1][-1] += '-'+title+'\n'+url+'\n'
                     if len(URLs[-1][-1]) > 750:
                         OutFlag = True
-                        await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
+                        await EmbedOut(client, message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
                         URLs[-1].append('')
             if not OutFlag or URLs[-1][-1] != '':
-                await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
+                await EmbedOut(client, message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
     elif List:
         Keys = ['']
         for key in PlayListFiles.keys():
@@ -293,10 +261,10 @@ async def ListOut(message, all=False, List=False):
             else: Keys[-1] += key+'\n'
             if len(Keys[-1]) > 750:
                 OutFlag = True
-                await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
+                await EmbedOut(client, message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
                 Keys.append('')
         if not OutFlag or Keys[-1] != '':
-            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
+            await EmbedOut(client, message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
         URLs = ['']
@@ -307,44 +275,25 @@ async def ListOut(message, all=False, List=False):
                 URLs[-1] += '-'+title+'\n'+url+'\n'
                 if len(URLs[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
+                    await EmbedOut(client, message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
                     URLs.append('')
         if not OutFlag or URLs[-1] != '':
-            await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
+            await EmbedOut(client, message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
 
-async def EmbedOut(channel, disc, playname, url, color):
-    embed = discord.Embed(description=disc, colour=color)
-    embed.add_field(name=playname, value=url if url != '' else 'Empty', inline=True)
-    await client.send_message(channel, embed=embed)
-
-async def PermissionErrorFunc(message):
-    await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
-    await log.ErrorLog('Do not have permissions')
-
-def CmdSpliter(cmd, index, sufIndex=False):
-    Flag = True
-    if '"' in cmd[index]:
-        tempStr = cmd[index]
-        while Flag:
-            index += 1
-            tempStr += ' ' + cmd[index]
-            if '"' in cmd[index]: break
-        SplitStr = tempStr.replace('"', '').strip()
-    else: SplitStr = cmd[index]
-    if sufIndex: return SplitStr, index
-    else: return SplitStr
-
-async def OptionError(message, cmd):
-    if len(cmd) > 1:
-        await client.send_message(message.channel, 'オプションが間違っている気がするなぁ')
-        await log.ErrorLog('The option is incorrect error')
-        return
-    await client.send_message(message.channel, '`'+cmd[0]+'`だけじゃ何したいのか分からないんだけど')
-    await log.ErrorLog('no option error') 
-
-async def NotArgsment(message):
-    await client.send_message(message.channel, 'オプションに引数が無いよ！')
-    await log.ErrorLog('Not argment')
+async def NextSet(message):
+    global NowPlayList
+    global player
+    global PlayURLs
+    if not RandomFlag: NowPlay = 0
+    else:
+        if not len(PlayURLs) == 0: NowPlay = randint(0, len(PlayURLs)-1)
+        else: NowPlay = 0
+    song = PlayURLs[NowPlay]
+    await player.play(message, song=('https://www.youtube.com/watch?v='+ song if not 'http' in song else song))
+    await log.MusicLog('Set {}'.format(PlayURLs[NowPlay]))
+    PlayURLs.remove(PlayURLs[NowPlay])
+    if len(PlayURLs) == 0:
+        PlayURLs = list(PlayListFiles[NowPlayList].keys())
 
 async def ScoreOut(message):
     global AnsUserDic
@@ -395,7 +344,7 @@ async def on_message(message):
         permissions = message.channel.permissions_for(message.author)
         cmd = message.content.split()
         if message.author.bot:
-            await PermissionErrorFunc(message)
+            await PermissionErrorFunc(log, client, message)
             return
         if '--list' in cmd:
             CmdFlag = True
@@ -418,21 +367,21 @@ async def on_message(message):
             return
         if '--rm' in cmd:
             if TrueORFalse[config['ROLECONF']['del_role_me']] and not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             RemoveFlag = True
             RoleName = CmdSpliter(cmd, cmd.index('--rm')+1)
         if '--add' in cmd:
             if TrueORFalse[config['ROLECONF']['add_role_me']] and not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             AddFlag = True
             RoleName = CmdSpliter(cmd, cmd.index('--add')+1)
         if '--add-another' in cmd:
             if not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             AddAnotherFlag = True
@@ -440,7 +389,7 @@ async def on_message(message):
             UserName = CmdSpliter(cmd, cmd.index('--add-another')+1)
         if '--rm-another' in cmd:
             if not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             RmAnotherFlag = True
@@ -448,14 +397,14 @@ async def on_message(message):
             UserName = CmdSpliter(cmd, cmd.index('--rm-another')+1)
         if '--create' in cmd:
             if not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             CreateFlag = True
             RoleName = CmdSpliter(cmd, cmd.index('--create')+1)
         if '--create-admin' in cmd:
             if TrueORFalse[config['ROLECONF']['create_role']] and not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             CreateFlag = True
@@ -463,7 +412,7 @@ async def on_message(message):
             RoleName = CmdSpliter(cmd, cmd.index('--create-admin')+1)
         if '--delete' in cmd:
             if TrueORFalse[config['ROLECONF']['remove_role']] and not permissions.administrator:
-                await PermissionErrorFunc(message)
+                await PermissionErrorFunc(log, client, message)
                 return
             CmdFlag = True
             DeleteFlag = True
@@ -554,7 +503,7 @@ async def on_message(message):
             else:
                 await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
-        if not CmdFlag: await OptionError(message, cmd)
+        if not CmdFlag: await OptionError(log, client, message, cmd)
     elif message.content.startswith(prefix+'music'):
         urlUseFlag = False
         cmdFlag = False
@@ -587,14 +536,14 @@ async def on_message(message):
             try:
                 PlayListName = cmd[cmd.index('--list-make')+1]
             except:
-                await NotArgsment(message)
+                await NotArgsment(log, client, message)
                 return
             if PlayListName in PlayListFiles.keys():
                 await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
                 await log.ErrorLog('Make request exist play list')
             else:
                 PlayListFiles[PlayListName] = {}
-                SavePlaylist(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, FileName=args.playlist)
                 NowPlayList = PlayListName
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
@@ -604,11 +553,11 @@ async def on_message(message):
             try:
                 PlayListName = cmd[cmd.index('--list-delete')+1]
             except:
-                await NotArgsment(message)
+                await NotArgsment(log, client, message)
                 return
             if PlayListName in PlayListFiles.keys() and not 'default' == PlayListName:
                 del PlayListFiles[PlayListName]
-                SavePlaylist(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, FileName=args.playlist)
                 await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
                 await log.MusicLog('Remove play list {}'.format(PlayListName))
                 if NowPlayList == PlayListName:
@@ -623,7 +572,7 @@ async def on_message(message):
                 prePlayListName = cmd[cmd.index('--list-rename')+1]
                 sufPlayListName = cmd[cmd.index('--list-rename')+2]
             except:
-                await NotArgsment(message)
+                await NotArgsment(log, client, message)
                 return
             if sufPlayListName in PlayListFiles.keys() and not 'default' == prePlayListName:
                 await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
@@ -632,7 +581,7 @@ async def on_message(message):
                 PlayListFiles[sufPlayListName] = deepcopy(PlayListFiles[prePlayListName])
                 if NowPlayList == prePlayListName: NowPlayList = sufPlayListName
                 del PlayListFiles[prePlayListName]
-                SavePlaylist(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, FileName=args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, '{}の名前を{}に変更します'.format(prePlayListName, sufPlayListName))
                 await log.MusicLog('Rename play list {}'.format(prePlayListName))
@@ -647,12 +596,12 @@ async def on_message(message):
             try:
                 ClearPlaylist = cmd[cmd.index('--list-clear')+1]
             except:
-                await NotArgsment(message)
+                await NotArgsment(log, client, message)
             if ClearPlaylist in PlayListFiles.keys():
                 PlayListFiles[ClearPlaylist] = {}
                 await client.send_message(message.channel, '{}をクリアしました'.format(ClearPlaylist))
                 await log.MusicLog('Cleared {}'.format(ClearPlaylist))
-                SavePlaylist(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, FileName=args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
                 await client.send_message(message.channel, 'そのプレイリストは存在しません')
@@ -663,7 +612,7 @@ async def on_message(message):
                 PlayListFiles[key] = {}
                 await client.send_message(message.channel, '{}をクリアしました'.format(key))
                 await log.MusicLog('Cleared {}'.format(key))
-            SavePlaylist(PlayListFiles, FileName=args.playlist)
+            SaveBinData(PlayListFiles, FileName=args.playlist)
             return
         if len(cmd) >= 2:
             for cmdpar in cmd:
@@ -727,7 +676,7 @@ async def on_message(message):
             await player.pause(message)
             PauseFlag = True
             cmdFlag = True
-        if not cmdFlag: await OptionError(message, cmd)
+        if not cmdFlag: await OptionError(log, client, message, cmd)
     elif message.content.startswith(prefix+'addmusic'):
         NotFound = True
         links = message.content.split()[1:]
@@ -748,7 +697,7 @@ async def on_message(message):
                     ineed[-1] += '-{}\n'.format(PlayListFiles[ListName][link])
                     NotFound = False
                     if len(ineed[-1]) > 750:
-                        await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
+                        await EmbedOut(client, message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
                         ineed.append('')
                         NotFound = True
                 except:
@@ -757,8 +706,8 @@ async def on_message(message):
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-        SavePlaylist(PlayListFiles, FileName=args.playlist)
-        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
+        SaveBinData(PlayListFiles, FileName=args.playlist)
+        if not ineed[-1] == '' and not NotFound: await EmbedOut(client, message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'delmusic'):
         NotFound = True
         links = message.content.split()[1:]
@@ -783,20 +732,20 @@ async def on_message(message):
                 notneed[-1] += '-{}\n'.format(Title)
                 await log.MusicLog('Del {}'.format(link))
                 if len(notneed[-1]) > 750:
-                    await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
+                    await EmbedOut(client, message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
                     notneed.append('')
                     NotFound = True
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
-        SavePlaylist(PlayListFiles, FileName=args.playlist)
-        if not notneed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
+        SaveBinData(PlayListFiles, FileName=args.playlist)
+        if not notneed[-1] == '' and not NotFound: await EmbedOut(client, message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
         if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
         if len(cmds) > 1:
             for cmd in cmds:
-                if cmd == 'role' or cmd == 'music' or cmd == 'spell' or cmd == 'study':
+                if cmd == 'role' or cmd == 'music' or cmd == 'spell' or cmd == 'study' or cmd == 'book':
                     cmdline = ''
                     for key, value in CommandDict[cmd].items():
                         cmdline += key + ': ' + value + '\n'
@@ -819,10 +768,10 @@ async def on_message(message):
                 if not spell == 'SpellList': SpellName[-1] += spell + '\n'
                 if len(SpellName[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
+                    await EmbedOut(client, message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
                     SpellName.append('')
             if not OutFlag or SpellName[-1]:
-                await EmbedOut(message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
+                await EmbedOut(client, message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
             return
         elif '--spell' in cmd:
             SpellName = CmdSpliter(cmd, cmd.index('--spell')+1)
@@ -832,10 +781,10 @@ async def on_message(message):
                 if not spell == 'SpellList': Spelltext[-1] += spell + '\n'
                 if len(Spelltext[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, disc='Spell', playname='Spells text', url=Spelltext[-1], color=0x000000)
+                    await EmbedOut(client, message.channel, disc='Spell', playname='Spells text', url=Spelltext[-1], color=0x000000)
                     Spelltext.append('')
             if not OutFlag or Spelltext[-1]:
-                await EmbedOut(message.channel, disc='Spell', playname='Spell text', url=Spelltext[-1], color=0x000000)
+                await EmbedOut(client, message.channel, disc='Spell', playname='Spell text', url=Spelltext[-1], color=0x000000)
             return
         elif '--del' in cmd:
             SpellName = CmdSpliter(cmd, cmd.index('--del')+1)
@@ -862,10 +811,10 @@ async def on_message(message):
                 Subject[-1] += sub + '\n'
                 if len(Subject[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
+                    await EmbedOut(client, message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
                     Subject.append('')
             if not OutFlag or Subject[-1]:
-                await EmbedOut(message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
+                await EmbedOut(client, message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
             return
         elif '--list-unit' in cmd:
             CmdFlag = True
@@ -876,10 +825,10 @@ async def on_message(message):
                 Unit[-1] += unit + '\n'
                 if len(Unit[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
+                    await EmbedOut(client, message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
                     Unit.append('')
             if not OutFlag or Unit[-1]:
-                await EmbedOut(message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
+                await EmbedOut(client, message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
             return
         elif '--list-ques' in cmd:
             CmdFlag = True
@@ -891,10 +840,10 @@ async def on_message(message):
                 QuesAns[-1] += ques + '  -  Ans:' + ans + '\n'
                 if len(QuesAns[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
+                    await EmbedOut(client, message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
                     QuesAns.append('')
             if not OutFlag or QuesAns[-1]:
-                await EmbedOut(message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
+                await EmbedOut(client, message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
             return
         elif '--del' in cmd:
             CmdFlag = True
@@ -976,7 +925,7 @@ async def on_message(message):
             AnsUserDic = {}
             await client.send_message(message.channel, 'それではスタート')
             await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic)+1, QuesLen, Q))
-        if not CmdFlag: await OptionError(message, cmd)
+        if not CmdFlag: await OptionError(log, client, message, cmd)
     elif message.content.startswith(prefix+'book'):
         cmd = message.content.split()[1:]
         if cmd[0] == '--add':
@@ -984,14 +933,14 @@ async def on_message(message):
                 await client.send_message(message.channel, 'すでに書籍が登録してあります。別の名前で登録してください')
             else:
                 BooksData[cmd[1]] = books.BookData(cmd[1], cmd[2], cmd[3])
-                books.SaveBooksData(args.book, BooksData)
+                SaveBinData(args.book, BooksData)
                 await client.send_message(message.channel, '書籍の登録が完了しました')
         elif cmd[0] == '--del':
             if not cmd[1] in BooksData.keys():
                 await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
             else:
                 del BooksData[cmd[1]]
-                books.SaveBooksData(args.book, BooksData)
+                SaveBinData(args.book, BooksData)
                 await client.send_message(message.channel, '書籍の削除が完了しました')
         elif cmd[0] == '--borrow':
             if not cmd[1] in BooksData.keys():
@@ -1002,7 +951,7 @@ async def on_message(message):
                 await client.send_message(message.channel, '正常に貸出処理が完了しました')
             elif status == -1:
                 await client.send_message(message.channel, '只今貸出中です。返却処理が終わってから再度貸出処理を行ってください')
-            books.SaveBooksData(args.book, BooksData)
+            SaveBinData(args.book, BooksData)
         elif cmd[0] == '--return':
             if not cmd[1] in BooksData.keys():
                 await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
@@ -1014,7 +963,7 @@ async def on_message(message):
                 await client.send_message(message.channel, '貸出処理が行われていません。貸出処理を行ってから返却処理を行ってください')
             elif status == -10:
                 await client.send_message(message.channel, '貸出ユーザとIDが違います。返却処理は本人が行ってください')
-            books.SaveBooksData(args.book, BooksData)
+            SaveBinData(args.book, BooksData)
         elif cmd[0] == '--list':
             listbook = ''
             outFlag = False
@@ -1026,11 +975,11 @@ async def on_message(message):
                     listbook += datalist[0] + ': ' + ('N/A' if datalist[1] is None else datalist[1]) + ': '+ ('貸出中' if datalist[2] else '貸出可')+'\n'
                 if len(listbook) > 750:
                     if len(cmd) == 1:
-                        await EmbedOut(message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
+                        await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
                     listbook = ''
                     outFlag = True
             if not outFlag:
-                await EmbedOut(message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
+                await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
@@ -1041,7 +990,7 @@ async def on_message(message):
             await client.close()
             await sys.exit(0)
         else:
-            PermissionErrorFunc(message)
+            PermissionErrorFunc(log, client, message)
     elif QuesFlag and (message.content.startswith(prefix+'ans') or (message.channel.id == config['BOTDATA']['studych'] and not message.author.bot)):
         cmd = message.content.split()
         if not message.author.name in AnsUserDic:
@@ -1126,7 +1075,7 @@ async def on_message(message):
                 else:
                     await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
                     await log.ErrorLog('Already interractive bot mode is OFF')
-            else: await OptionError(message, cmd)
+            else: await OptionError(log, client, message, cmd)
         else:
             await client.send_message(message.channel, '現在このコマンドは無効化されています')
             await log.ErrorLog('Ibot mode is Disable')

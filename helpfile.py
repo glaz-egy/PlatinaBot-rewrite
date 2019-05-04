@@ -12,12 +12,16 @@ prefix = config['BOTDATA']['cmdprefix']
 CommandDictJP = OrderedDict()
 CommandDictJP = {'help': OrderedDict(),
                 'music': OrderedDict(),
-                'role': OrderedDict()}
+                'role': OrderedDict(),
+                'spell': OrderedDict(),
+                'study': OrderedDict(),
+                'book': OrderedDict()}
 
 CommandDictJP['help'] = { '`'+prefix+'role`': '役職関係のコマンド 詳しくは`{}help roleを見てね！`'.format(prefix),
                         '`'+prefix+'music`': '音楽を再生するかもしれないコマンド `{}help music`で詳しく確認できるよ！'.format(prefix),
                         '`'+prefix+'spell`': '呪文を唱えるコマンド `{}help spell`で確認できます'.format(prefix),
                         '`'+prefix+'study`': '勉強用のコマンド `{}help study`で確認できます'.format(prefix),
+                        '`'+prefix+'book`': '書籍管理用のコマンド `{}help book`で確認できます'.format(prefix),
                         '`'+prefix+'say SayText`': 'ボットがSayTextの内容を発言します それだけのコマンド',
                         '`'+prefix+'ibot option`': '`--start`でIBOTモードをON,`--stop`でOFFにします',
                         '`'+prefix+'version`': '現在のバージョンを確認できる',
@@ -72,6 +76,17 @@ CommandDictJP['study'] = {'`'+prefix+'study`': '勉強用のコマンド',
                         '`'+prefix+'ans Anwser`': '答えを入力します 専用チャンネルでは`Anwser`だけでも回答可能です',
                         '`'+prefix+'ans --next`': '解答を出力して次の問題へ移ります',
                         '`'+prefix+'ans --exit`': '出題を中断します'}
+
+CommandDictJP['book'] = {'`'+prefix+'book`': '書籍管理用のコマンド',
+                        '`--add BookName BookAuthor [Release]`': '書籍を追加します BookName:書籍名 BookAuthor:著者名 Release:出版年月日(任意)',
+                        '`--del BookName`': '書籍を削除します',
+                        '`--borrow BookName`': '書籍を借りる際に使用します 借りる人がコマンドを利用しましょう',
+                        '`--return BookName`': '書籍を返却する際に使用します 返却する人がコマンドを利用しましょう',
+                        '`--list [item]`': '登録書籍をリスト化します itemに使える文字列-author, release, regist, update, lenduser, code\n\
+                                            以下のように出力されます\n\
+                                            [無指定] 書籍名: 貸出状態\n[author] 書籍名: 著者名: 貸出状態\n[release] 書籍名: 出版年月日: 貸出状態\n\
+                                            [regist] 書籍名: 登録日: 貸出状態\n[update] 書籍名: 更新日: 貸出状態\n[lenduser] 書籍名: 現在借りている人の名前: 貸出状態\n[code] 書籍名: ハッシュ化されたコード: 貸出状態\n\
+                                            該当項目に値がない場合`N/A`と出力されます ハッシュ化されたコードは今後アップデートにより実装される機能に使用されます'}
 
 CommandDictEN = OrderedDict()
 CommandDictEN = {'help': OrderedDict(),

@@ -5,10 +5,10 @@ from hashlib import md5
 import pickle
 
 class BookData:
-    def __init__(self, Name, Author, Relese=None):
+    def __init__(self, Name, Author, Release=None):
         self.__name = Name
         self.__author = Author
-        self.__relece = Relese
+        self.__release = Release
         self.__registerdate = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.__LendingUserName = None
         self.__LendingUserId = 0
@@ -44,8 +44,8 @@ class BookData:
             self.__name = value
         elif key.lower() == 'author':
             self.__author = value
-        if key.lower() == 'relece':
-            self.__relece = value
+        if key.lower() == 'release':
+            self.__release = value
         self.UpdateDate = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     def GetBookInfo(self, data=None):
@@ -53,8 +53,8 @@ class BookData:
             return [self.__name, self.LendingFlag]
         elif data == 'author':
             return [self.__name, self.__author, self.LendingFlag]
-        elif data == 'relece':
-            return [self.__name, self.__relece, self.LendingFlag]
+        elif data == 'release':
+            return [self.__name, self.__release, self.LendingFlag]
         elif data == 'regist':
             return [self.__name, self.__registerdate, self.LendingFlag]
         elif data == 'update':
