@@ -174,6 +174,11 @@ class MusicPlayer:
             return
         state.skip()
 
+def BookDataHashDict(Data):
+    HashDict = {}
+    for D in Data.values():
+        HashDict[D.code] = D.name
+    return HashDict
 
 
 MusicMessage = None
@@ -210,19 +215,20 @@ prefix = config['BOTDATA']['cmdprefix']
 with open('help.dat', 'rb') as f:
     Data = pickle.load(f)
     CommandDict = Data['JP']
-if os.path.isfile(args.playlist): PlayListFiles = LoadBinData(FileName=args.playlist)
+if os.path.isfile(args.playlist): PlayListFiles = LoadBinData(args.playlist)
 else:
     PlayListFiles['default'] = {}
-    SaveBinData(PlayListFiles, FileName=args.playlist)
+    SaveBinData(PlayListFiles, args.playlist)
 NowPlayList = 'default'
 PlayURLs = list(PlayListFiles[NowPlayList].keys())
 UnmodifiableRole = config['ROLECONF']['unmodif_role'].split('@')
 if os.path.isfile(args.book): BooksData = LoadBinData(args.book)
 else:
     BooksData = {}
-    SaveBinData(args.book, BooksData)
+    SaveBinData(BooksData, args.book)
 maindir = os.getcwd()
 
+BookDataHash = BookDataHashDict(BooksData)
 Spell = retain.spell.Spell(args.spell)
 Study = retain.study.Study(args.study)
 client = discord.Client()
@@ -308,6 +314,7 @@ async def ScoreOut(message):
     except:
         await client.send_message(message.channel, '成績がありません')
 
+
 @client.event
 async def on_ready():
     await log.Log('Bot is Logging in!!')
@@ -319,7 +326,7 @@ async def on_message(message):
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
     global QuesDic, QuesFlag, Q, A, QuesLen, AnsUserDic
-    global LockFlag, BooksData
+    global LockFlag, BooksData, BookDataHash
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
@@ -543,7 +550,7 @@ async def on_message(message):
                 await log.ErrorLog('Make request exist play list')
             else:
                 PlayListFiles[PlayListName] = {}
-                SaveBinData(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, args.playlist)
                 NowPlayList = PlayListName
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, '新しくプレイリストが作成されました')
@@ -557,7 +564,7 @@ async def on_message(message):
                 return
             if PlayListName in PlayListFiles.keys() and not 'default' == PlayListName:
                 del PlayListFiles[PlayListName]
-                SaveBinData(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, args.playlist)
                 await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
                 await log.MusicLog('Remove play list {}'.format(PlayListName))
                 if NowPlayList == PlayListName:
@@ -581,7 +588,7 @@ async def on_message(message):
                 PlayListFiles[sufPlayListName] = deepcopy(PlayListFiles[prePlayListName])
                 if NowPlayList == prePlayListName: NowPlayList = sufPlayListName
                 del PlayListFiles[prePlayListName]
-                SaveBinData(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
                 await client.send_message(message.channel, '{}の名前を{}に変更します'.format(prePlayListName, sufPlayListName))
                 await log.MusicLog('Rename play list {}'.format(prePlayListName))
@@ -601,7 +608,7 @@ async def on_message(message):
                 PlayListFiles[ClearPlaylist] = {}
                 await client.send_message(message.channel, '{}をクリアしました'.format(ClearPlaylist))
                 await log.MusicLog('Cleared {}'.format(ClearPlaylist))
-                SaveBinData(PlayListFiles, FileName=args.playlist)
+                SaveBinData(PlayListFiles, args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
                 await client.send_message(message.channel, 'そのプレイリストは存在しません')
@@ -612,7 +619,7 @@ async def on_message(message):
                 PlayListFiles[key] = {}
                 await client.send_message(message.channel, '{}をクリアしました'.format(key))
                 await log.MusicLog('Cleared {}'.format(key))
-            SaveBinData(PlayListFiles, FileName=args.playlist)
+            SaveBinData(PlayListFiles, args.playlist)
             return
         if len(cmd) >= 2:
             for cmdpar in cmd:
@@ -629,7 +636,7 @@ async def on_message(message):
                 if len(PlayURLs) >= 1: music = randint(0, len(PlayURLs)-1)
                 elif len(PlayURLs) == 0: music = 0
                 else:
-                    await client.send_message(message.channle, 'プレイリストに曲が入ってないよ！')
+                    await client.send_message(message.channel, 'プレイリストに曲が入ってないよ！')
                     await log.ErrorLog('Not music in playlist')
                     return
                 try:
@@ -706,7 +713,7 @@ async def on_message(message):
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
                 await client.send_message(message.channel, 'その曲もう入ってない？')
-        SaveBinData(PlayListFiles, FileName=args.playlist)
+        SaveBinData(PlayListFiles, args.playlist)
         if not ineed[-1] == '' and not NotFound: await EmbedOut(client, message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'delmusic'):
         NotFound = True
@@ -738,7 +745,7 @@ async def on_message(message):
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
                 await client.send_message(message.channel, 'そんな曲入ってたかな？')
-        SaveBinData(PlayListFiles, FileName=args.playlist)
+        SaveBinData(PlayListFiles, args.playlist)
         if not notneed[-1] == '' and not NotFound: await EmbedOut(client, message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
         if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
@@ -933,53 +940,64 @@ async def on_message(message):
                 await client.send_message(message.channel, 'すでに書籍が登録してあります。別の名前で登録してください')
             else:
                 BooksData[cmd[1]] = books.BookData(cmd[1], cmd[2], cmd[3])
-                SaveBinData(args.book, BooksData)
+                SaveBinData(BooksData, args.book)
                 await client.send_message(message.channel, '書籍の登録が完了しました')
+                BookDataHash[BooksData[cmd[1]].code] = cmd[1]
         elif cmd[0] == '--del':
             if not cmd[1] in BooksData.keys():
                 await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
             else:
+                del BookDataHash[BooksData[cmd[1]].code]
                 del BooksData[cmd[1]]
-                SaveBinData(args.book, BooksData)
+                SaveBinData(BooksData, args.book)
                 await client.send_message(message.channel, '書籍の削除が完了しました')
-        elif cmd[0] == '--borrow':
-            if not cmd[1] in BooksData.keys():
+        elif '--borrow' in cmd[0]:
+            if '-hash' in cmd[0]: name = BookDataHash[cmd[1]]
+            elif cmd[0] == '--borrow': name = cmd[1]
+            else: await client.send_message(message.channel, 'オプションの選択が間違っています')
+            if not name in BooksData.keys():
                 await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
                 return
-            status = BooksData[cmd[1]].LendingBook(message.author.name, message.author.id)
+            status = BooksData[name].LendingBook(message.author.name, message.author.id)
             if status == 0:
                 await client.send_message(message.channel, '正常に貸出処理が完了しました')
             elif status == -1:
                 await client.send_message(message.channel, '只今貸出中です。返却処理が終わってから再度貸出処理を行ってください')
-            SaveBinData(args.book, BooksData)
+            SaveBinData(BooksData, args.book)
         elif cmd[0] == '--return':
-            if not cmd[1] in BooksData.keys():
+            if '-hash' in cmd[0]: name = BookDataHash[cmd[1]]
+            elif cmd[0] == '--return': name = cmd[1]
+            else: await client.send_message(message.channel, 'オプションの選択が間違っています')
+            if not name in BooksData.keys():
                 await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
                 return
-            status = BooksData[cmd[1]].ReturnBook(message.author.name, message.author.id)
+            status = BooksData[name].ReturnBook(message.author.name, message.author.id)
             if status == 0:
                 await client.send_message(message.channel, '正常に返却処理が完了しました')
             elif status == -1:
                 await client.send_message(message.channel, '貸出処理が行われていません。貸出処理を行ってから返却処理を行ってください')
             elif status == -10:
                 await client.send_message(message.channel, '貸出ユーザとIDが違います。返却処理は本人が行ってください')
-            SaveBinData(args.book, BooksData)
+            SaveBinData(BooksData, args.book)
         elif cmd[0] == '--list':
             listbook = ''
             outFlag = False
             for key in BooksData.keys():
                 datalist = BooksData[key].GetBookInfo(data = (None if (len(cmd) == 1) else cmd[1]))
+                if datalist == 0:
+                    await client.send_message(message.channel, '表示項目の指定が間違っています')
+                    return
                 if len(datalist) == 2:
                     listbook += datalist[0] + ': ' + ('貸出中' if datalist[1] else '貸出可')+'\n'
                 elif len(datalist) == 3:
                     listbook += datalist[0] + ': ' + ('N/A' if datalist[1] is None else datalist[1]) + ': '+ ('貸出中' if datalist[2] else '貸出可')+'\n'
                 if len(listbook) > 750:
                     if len(cmd) == 1:
-                        await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
+                        await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x5042f4)
                     listbook = ''
                     outFlag = True
             if not outFlag:
-                await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x100000)
+                await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x5042f4)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:

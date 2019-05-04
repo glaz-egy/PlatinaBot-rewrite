@@ -63,12 +63,13 @@ class BookData:
             return [self.__name, self.__LendingUserName, self.LendingFlag]
         elif data == 'code':
             return [self.__name, self.__bookcode, self.LendingFlag]
+        else:
+            return 0
+    
+    @property
+    def name(self):
+        return self.__name
 
-def SaveBooksData(FileName, Data):
-    with open(FileName, 'wb') as f:
-        pickle.dump(Data, f)
-
-def LoadBooksData(FileName):
-    with open(FileName, 'rb') as f:
-        Data = pickle.load(f)
-    return Data
+    @property
+    def code(self):
+        return self.__bookcode
