@@ -20,24 +20,24 @@ def CmdSpliter(cmd, index, sufIndex=False):
     else: return SplitStr
 
 async def NotArgsment(log, client, message):
-    await client.send_message(message.channel, 'オプションに引数が無いよ！')
+    await message.channel.send('オプションに引数が無いよ！')
     await log.ErrorLog('Not argment')
 
-async def EmbedOut(client, channel, disc, playname, url, color):
+async def EmbedOut(channel, disc, playname, url, color=0x000000):
     embed = discord.Embed(description=disc, colour=color)
-    embed.add_field(name=playname, value=url if url != '' else 'Empty', inline=True)
-    await client.send_message(channel, embed=embed)
+    embed.add_field(name=playname, value=url, inline=True)
+    await channel.send(embed=embed)
 
 async def PermissionErrorFunc(log, client, message):
-    await client.send_message(message.channel, 'このコマンドは君じゃ使えないんだよなぁ')
+    await message.channel.send('このコマンドは君じゃ使えないんだよなぁ')
     await log.ErrorLog('Do not have permissions')
 
 async def OptionError(log, client, message, cmd):
     if len(cmd) > 1:
-        await client.send_message(message.channel, 'オプションが間違っている気がするなぁ')
+        await message.channel.send('オプションが間違っている気がするなぁ')
         await log.ErrorLog('The option is incorrect error')
         return
-    await client.send_message(message.channel, '`'+cmd[0]+'`だけじゃ何したいのか分からないんだけど')
+    await message.channel.send('`'+cmd[0]+'`だけじゃ何したいのか分からないんだけど')
     await log.ErrorLog('no option error')
 
 def SaveBinData(PLdata, FileName):
@@ -49,12 +49,19 @@ def LoadBinData(FileName):
         PLdata = pickle.load(f)
     return PLdata
 
-def ArgsInit():
+def ArgsInit(MainCall=True):
     parser = ArgumentParser(description='Playlist, log and config set args')
-    parser.add_argument('--playlist', default='playlist.plf')
-    parser.add_argument('--log', default='bot.log')
-    parser.add_argument('--config', default='config.ini')
-    parser.add_argument('--spell', default='Spelldata.sp')
-    parser.add_argument('--study', default='Studydata.sf')
-    parser.add_argument('--book', default='bookfile.bf')
+    if MainCall:
+        parser.add_argument('--playlist', default='playlist.plf')
+        parser.add_argument('--log', default='bot.log')
+        parser.add_argument('--config', default='config.ini')
+        parser.add_argument('--spell', default='Spelldata.sp')
+        parser.add_argument('--study', default='Studydata.sf')
+        parser.add_argument('--book', default='bookfile.bf')
+        parser.add_argument('--schedule', default='schedule.sd')
+        parser.add_argument('--job', default='job.jf')
+    else:
+        parser.add_argument('--config', default='config.ini')
+        parser.add_argument('--schedule', default='schedule.sd')
+        parser.add_argument('--date', required=True)
     return parser.parse_args()

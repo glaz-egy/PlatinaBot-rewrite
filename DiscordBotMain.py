@@ -5,12 +5,14 @@ from datetime import datetime, date
 from collections import OrderedDict
 from argparse import ArgumentParser
 from random import random, randint, choice
-from youtube_dl import YoutubeDL
+import youtube_dl
 from retainBot import retain
 from copy import deepcopy
 from glob import glob
 from function import *
+import subprocess
 import threading
+import schedule
 import discord
 import hashlib
 import asyncio
@@ -22,6 +24,50 @@ import time
 import sys
 import os
 import re
+
+youtube_dl.utils.bug_reports_message = lambda: ''
+
+ytdl_format_options = {
+    'format': 'bestaudio/best',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
+
+ffmpeg_options = {
+    'options': '-vn'
+}
+
+ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+
+
+class YTDLSource(discord.PCMVolumeTransformer):
+    def __init__(self, source, *, data, volume=0.5):
+        super().__init__(source, volume)
+
+        self.data = data
+
+        self.title = data.get('title')
+        self.url = data.get('url')
+
+    @classmethod
+    async def from_url(cls, url, *, loop=None, stream=False):
+        loop = loop or asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+
+        if 'entries' in data:
+            # take first item from a playlist
+            data = data['entries'][0]
+
+        filename = data['url'] if stream else ytdl.prepare_filename(data)
+        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class LogControl:
     def __init__(self, FileName):
@@ -50,25 +96,17 @@ class VoiceEntry:
         return fmt
 
 class Calendar:
-    def __init__(self, bot):
-        self.CalData = {}
-        self.bot = bot
-
-    async def CalTask(self):
-        print('test')
-        self.CalData['2018-11-10'] = ['test', 'korehatesoto', self.bot.get_channel('508137939491094557'), False]
-        _ = str(date.today())
-        embed = discord.Embed(description='2018-11-10', colour=0x000000)
-        embed.add_field(name=self.CalData['2018-11-10'][0], value=self.CalData['2018-11-10'][1], inline=True)
-        await self.bot.send_message(self.bot.get_channel('508137939491094557'), embed=embed)
-
-    def CalRegister(self, eventDay, eventName, eventContent, outChannel, Loop=False):
-        self.CalData[eventDay] = [eventName, eventContent, outChannel, Loop]
+    def __init__(self, Day, Name, Content, Flags):
+        self.eventDay = Day
+        self.eventName = Name
+        self.eventContent = Content
+        self.Flags = Flags
 
 class VoiceState:
-    def __init__(self, bot):
+    def __init__(self, bot, channel):
         self.current = None
         self.voice = None
+        self.channel = channel
         self.bot = bot
         self.play_next_song = asyncio.Event()
         self.songs = asyncio.Queue()
@@ -98,7 +136,7 @@ class VoiceState:
             self.play_next_song.clear()
             self.current = await self.songs.get()
             await NextSet(MusicMessage)
-            if TitleFlag: await self.bot.send_message(self.current.channel, 'Now playing **{}**'.format(self.current))
+            if TitleFlag: await self.channel.send('Now playing **{}**'.format(self.current))
             self.current.player.start()
             await self.play_next_song.wait()
 
@@ -107,54 +145,54 @@ class MusicPlayer:
         self.bot = bot
         self.voice_states = {}
 
-    def get_voice_state(self, server):
+    def get_voice_state(self, server, channel):
         state = self.voice_states.get(server.id)
         if state is None:
-            state = VoiceState(self.bot)
+            state = VoiceState(self.bot, channel)
             self.voice_states[server.id] = state
 
         return state
 
     async def play(self, message, *, song : str):
-        state = self.get_voice_state(message.server)
-        opts = {'default_search': 'auto',
-                'quiet': True,}
+        state = self.get_voice_state(message.guild, message.channel)
 
         if state.voice is None:
-            voice_channel = message.author.voice_channel
+            voice_channel = message.author.voice
             if voice_channel is None:
-                await self.bot.send_message(message.channel, 'ボイスチャネルに入ってないじゃん!')
+                await message.channel.send('ボイスチャネルに入ってないじゃん!')
                 await log.ErrorLog('User not in voice channel')
                 return False
-            state.voice = await self.bot.join_voice_channel(voice_channel)
+            #state.voice = await self.bot.join_voice_channel(voice_channel.channel)
 
         try:
-            player = await state.voice.create_ytdl_player(song, ytdl_options=opts, after=state.toggle_next)
+            VoiceClient = await voice_channel.channel.connect(timeout=100000000000000)
+            player = await YTDLSource.from_url(song, stream=True)
+            VoiceClient.play(source=player, after=state.toggle_next)
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
-            await self.bot.send_message(message.channel, fmt.format(type(e).__name__, e))
-            await NextSet(MusicMessage)
+            await message.channel.send(fmt.format(type(e).__name__, e))
+            #await NextSet(MusicMessage)
         else:
             player.volume = 0.3
             entry = VoiceEntry(message, player)
             await log.MusicLog('{}: {}'.format(player.title, player.url))
-            await state.songs.put(entry)
+            await message.channel.send(entry)
 
     async def pause(self, message):
-        state = self.get_voice_state(message.server)
+        state = self.get_voice_state(message.guild, message.channel)
         if state.is_playing():
             player = state.player
             player.pause()
 
     async def resume(self, message):
-        state = self.get_voice_state(message.server)
+        state = self.get_voice_state(message.guild, message.channel)
         if state.is_playing():
             player = state.player
             player.resume()
 
     async def stop(self, message):
-        server = message.server
-        state = self.get_voice_state(server)
+        server = message.guild
+        state = self.get_voice_state(message.guild, message.channel)
 
         if state.current.player.is_playing():
             player = state.current.player
@@ -168,7 +206,7 @@ class MusicPlayer:
             pass
 
     async def skip(self, message):
-        state = self.get_voice_state(message.server)
+        state = self.get_voice_state(message.guild, message.channel)
         if not state.is_playing():
             await self.bot.send_message(message.channel, 'Not playing any music right now...')
             return
@@ -180,6 +218,8 @@ def BookDataHashDict(Data):
         HashDict[D.code] = D.name
     return HashDict
 
+def Job():
+    print('OK')
 
 MusicMessage = None
 player = None
@@ -226,16 +266,33 @@ if os.path.isfile(args.book): BooksData = LoadBinData(args.book)
 else:
     BooksData = {}
     SaveBinData(BooksData, args.book)
+if os.path.isfile(args.schedule): CalData = LoadBinData(args.schedule)
+else:
+    CalData = {}
+    SaveBinData(CalData, args.schedule)
+if os.path.isfile(args.job): JobDic = LoadBinData(args.job)
+else:
+    JobDic = {}
+    SaveBinData(JobDic, args.job)
 maindir = os.getcwd()
 
 BookDataHash = BookDataHashDict(BooksData)
 Spell = retain.spell.Spell(args.spell)
 Study = retain.study.Study(args.study)
 client = discord.Client()
-Cal = Calendar(client)
 
 TrueORFalse = {'Enable': True,
                 'Disable': False}
+
+schedule.every(10).seconds.do(Job)
+schedule.run_pending()
+
+def JobControl(name, cmd):
+    if not name in JobDic.keys():
+        JobDic[name] = {'start': [],
+                        'end': []}
+    JobDic[name][cmd].append(datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+    SaveBinData(JobDic, args.job)
 
 async def ListOut(message, all=False, List=False):
     global NowPlayList
@@ -251,15 +308,15 @@ async def ListOut(message, all=False, List=False):
             if key == NowPlayList: keys[-1] += '(Now playlist)'
             if not len(value) == 0:
                 for url, title in value.items():
-                    if title is None: title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
+                    if title is None: title = youtube_dl.YoutubeDL().extract_info(url=url, download=False, process=False)['title']
                     url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
                     URLs[-1][-1] += '-'+title+'\n'+url+'\n'
                     if len(URLs[-1][-1]) > 750:
                         OutFlag = True
-                        await EmbedOut(client, message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
+                        await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
                         URLs[-1].append('')
             if not OutFlag or URLs[-1][-1] != '':
-                await EmbedOut(client, message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1], 0x6b8e23)
+                await EmbedOut(message.channel, 'All playlist: page{}'.format(len(URLs[-1])), keys[-1], URLs[-1][-1] if URLs[-1][-1] != '' else 'Empty', 0x6b8e23)
     elif List:
         Keys = ['']
         for key in PlayListFiles.keys():
@@ -267,24 +324,24 @@ async def ListOut(message, all=False, List=False):
             else: Keys[-1] += key+'\n'
             if len(Keys[-1]) > 750:
                 OutFlag = True
-                await EmbedOut(client, message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
+                await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
                 Keys.append('')
         if not OutFlag or Keys[-1] != '':
-            await EmbedOut(client, message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
+            await EmbedOut(message.channel, 'Playlist List: page{}'.format(len(Keys)), 'Playlists', Keys[-1], 0x6a5acd)
     else:
         await log.Log('Call playlist is {}'.format(PlayListFiles[NowPlayList]))
         URLs = ['']
         if not len(PlayListFiles[NowPlayList]) == 0:
             for url, title in PlayListFiles[NowPlayList].items():
-                if title is None: title = YoutubeDL().extract_info(url=url, download=False, process=False)['title']
+                if title is None: title = youtube_dl.YoutubeDL().extract_info(url=url, download=False, process=False)['title']
                 url = 'https://www.youtube.com/watch?v='+ url if not 'http' in url else url
                 URLs[-1] += '-'+title+'\n'+url+'\n'
                 if len(URLs[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(client, message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
+                    await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
                     URLs.append('')
         if not OutFlag or URLs[-1] != '':
-            await EmbedOut(client, message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1], 0x708090)
+            await EmbedOut(message.channel, 'Now playlist: page{}'.format(len(URLs)), NowPlayList, URLs[-1] if URLs[-1] != '' else 'Empty', 0x708090)
 
 async def NextSet(message):
     global NowPlayList
@@ -306,13 +363,13 @@ async def ScoreOut(message):
     tmpvalue = 0
     try:
         for key, value in AnsUserDic.items():
-            await client.send_message(message.channel, '{}:{}問正解'.format(key, value))
+            await message.channel.send('{}:{}問正解'.format(key, value))
             if value > tmpvalue:
                 tmpvalue = value
                 tmpuser = key
-        await client.send_message(message.channel, '成績優秀者は{}でした'.format(tmpuser))
+        await message.channel.send('成績優秀者は{}でした'.format(tmpuser))
     except:
-        await client.send_message(message.channel, '成績がありません')
+        await message.channel.send('成績がありません')
 
 
 @client.event
@@ -326,14 +383,14 @@ async def on_message(message):
     global PauseFlag, PlayFlag, IbotFlag, TitleFlag
     global SpellInput, SpellDataG, SpellNameG
     global QuesDic, QuesFlag, Q, A, QuesLen, AnsUserDic
-    global LockFlag, BooksData, BookDataHash
+    global LockFlag, BooksData, BookDataHash, CalData
     if SpellInput:
         SpellDataG.append(message.content)
         if SpellDataG[-1] == 'end':
             SpellInput = False
             await log.Log('Create spell {}'.format(SpellNameG))
             SpellDataG.remove('end')
-            await client.send_message(message.channel, '入力を終了しました')
+            await message.channel.send('入力を終了しました')
             if IbotFlag: InteractiveBot.Spell.AddSpell(SpellDataG, SpellNameG)
             else: Spell.AddSpell(SpellDataG, SpellNameG)
             print(Spell.SpellDic)
@@ -369,7 +426,7 @@ async def on_message(message):
             embed = discord.Embed(description='Role List', colour=0x228b22)
             embed.add_field(name='Admin', value=AdminRoles, inline=True)
             embed.add_field(name='Local', value=NomalRoles, inline=True)
-            await client.send_message(message.channel, embed=embed)
+            await message.channel.send(embed=embed)
             await log.Log('Confirmation role list')
             return
         if '--rm' in cmd:
@@ -425,10 +482,10 @@ async def on_message(message):
             DeleteFlag = True
             RoleName = CmdSpliter(cmd, cmd.index('--delete')+1)
         if (CreateFlag or DeleteFlag) and (AddFlag or RemoveFlag):
-            await client.send_message(message.channel, 'そのコマンドは両立出来ないなぁ')
+            await message.channel.send('そのコマンドは両立出来ないなぁ')
             await log.ErrorLog('A command for the server and a command for the member are entered error')
         if CreateFlag and RemoveFlag:
-            await client.send_message(message.channel, '作るのと削除と、どっちが良いの!？')
+            await message.channel.send('作るのと削除と、どっちが良いの!？')
             await log.ErrorLog('Create and Remove command are entered error')
             return
         elif CreateFlag:
@@ -441,74 +498,74 @@ async def on_message(message):
                         await client.create_role(message.server, permissions=per,name=RoleName, colour=discord.Colour(randint(0, 16777215)))
                         await log.Log('Create admin role: {}'.format(RoleName))
                     else:
-                        await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職を作成できません'.format(message.author.name))
+                        await message.channel.send('{}には管理者権限が無いので管理者権限を含む役職を作成できません'.format(message.author.name))
                         await log.Log('Create request higher level authority')
                         return
                 else:
                     await client.create_role(message.server, name=RoleName, colour=discord.Colour(randint(0, 16777215)))
                     await log.Log('Create role: {}'.format(RoleName))
-                await client.send_message(message.channel, '{}は誰のものになるのかな？'.format(RoleName))
+                await message.channel.send('{}は誰のものになるのかな？'.format(RoleName))
             else:
-                await client.send_message(message.channel, 'あるよ！ {} あるよッ！'.format(RoleName))
+                await message.channel.send('あるよ！ {} あるよッ！'.format(RoleName))
                 await log.Log('Role: {} is exist in this server yet'.format(RoleName))
             return
         elif DeleteFlag:
             role = discord.utils.get(message.author.server.roles, name=RoleName)
             if role.permissions.administrator and not permissions.administrator:
-                await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職を削除できません'.format(message.author.name))
+                await message.channel.send('{}には管理者権限が無いので管理者権限を含む役職を削除できません'.format(message.author.name))
                 await log.Log('Deleate request higher level authority')
                 return
             await client.delete_role(message.server, role)
-            await client.send_message(message.channel, '{}はもう消されてしまいました……'.format(RoleName))
+            await message.channel.send('{}はもう消されてしまいました……'.format(RoleName))
             await log.Log('Delete role: {}'.format(RoleName))
             return
         if AddFlag and RemoveFlag or AddAnotherFlag and RmAnotherFlag:
-            await client.send_message(message.channel, '追加するの？　消すの？　はっきりしてよ……')
+            await message.channel.send('追加するの？　消すの？　はっきりしてよ……')
             await log.ErrorLog('Add and Del command are entered')
             return
         isChange = (not RoleName in UnmodifiableRole) or (TrueORFalse[config['ROLECONF']['unmodif_admin']] and permissions.administrator)
         role = discord.utils.get(message.author.server.roles, name=RoleName)
         if role is None:
-            await client.send_message(message.channel, 'そんな役職無いよ!')
+            await message.channel.send('そんな役職無いよ!')
             await log.ErrorLog('Role: {} is not exist in this server'.format(RoleName))
             return
         elif AddAnotherFlag:
             user = discord.utils.get(message.author.server.menbers, name=UserName)
             if user is None:
-                await client.send_message(message.channel, 'そんな人はいないんだけどな')
+                await message.channel.send('そんな人はいないんだけどな')
                 await log.ErrorLog('User: {} is not exist in this server'.format(UserName))
                 return
             await client.add_roles(user, role)
-            await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(UserName, RoleName))
+            await message.channel.send('{}に{}の役職が追加されたよ！'.format(UserName, RoleName))
             await log.Log('Add role: {} in {}'.format(UserName, RoleName))
         elif RmAnotherFlag:
             user = discord.utils.get(message.author.server.menbers, name=UserName)
             if user is None:
-                await client.send_message(message.channel, 'そんな人はいないんだけどな')
+                await message.channel.send('そんな人はいないんだけどな')
                 await log.ErrorLog('User: {} is not exist in this server'.format(UserName))
                 return
             await client.remove_roles(user, role)
-            await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(UserName, RoleName))
+            await message.channel.send('{}の{}が削除されたよ！'.format(UserName, RoleName))
             await log.Log('Remove role: {}\'s {}'.format(UserName, RoleName))
         elif AddFlag:
             if role.permissions.administrator and not permissions.administrator:
-                await client.send_message(message.channel, '{}には管理者権限が無いので管理者権限を含む役職には成れません'.format(message.author.name))
+                await message.channel.send('{}には管理者権限が無いので管理者権限を含む役職には成れません'.format(message.author.name))
                 await log.Log('Request higher level authority')
                 return
             if isChange:
                 await client.add_roles(message.author, role)
-                await client.send_message(message.channel, '{}に{}の役職が追加されたよ！'.format(message.author.name, RoleName))
+                await message.channel.send('{}に{}の役職が追加されたよ！'.format(message.author.name, RoleName))
                 await log.Log('Add role: {} in {}'.format(message.author.name, RoleName))
             else:
-                await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
+                await message.channel.send('{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
         elif RemoveFlag:
             if isChange:
                 await client.remove_roles(message.author, role)
-                await client.send_message(message.channel, '{}の{}が削除されたよ！'.format(message.author.name, RoleName))
+                await message.channel.send('{}の{}が削除されたよ！'.format(message.author.name, RoleName))
                 await log.Log('Remove role: {}\'s {}'.format(message.author.name, RoleName))
             else:
-                await client.send_message(message.channel, '{}は変更不可能役職です'.format(RoleName))
+                await message.channel.send('{}は変更不可能役職です'.format(RoleName))
                 await log.ErrorLog('Add request Unmodifiable role: {}'.format(RoleName))
         if not CmdFlag: await OptionError(log, client, message, cmd)
     elif message.content.startswith(prefix+'music'):
@@ -532,10 +589,10 @@ async def on_message(message):
                 NowPlayList = 'default'
             try:
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
-                await client.send_message(message.channel, 'プレイリストが{}から{}へ変更されました'.format(temp, NowPlayList))
+                await message.channel.send('プレイリストが{}から{}へ変更されました'.format(temp, NowPlayList))
                 await log.MusicLog('Play list change {} to {}'.format(temp, NowPlayList))
             except:
-                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await message.channel.send('そのプレイリストは存在しません')
                 await log.ErrorLog('Request not exist Play list ')
                 NowPlayList = temp
             return
@@ -546,14 +603,14 @@ async def on_message(message):
                 await NotArgsment(log, client, message)
                 return
             if PlayListName in PlayListFiles.keys():
-                await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
+                await message.channel.send('そのプレイリストはすでに存在します')
                 await log.ErrorLog('Make request exist play list')
             else:
                 PlayListFiles[PlayListName] = {}
                 SaveBinData(PlayListFiles, args.playlist)
                 NowPlayList = PlayListName
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
-                await client.send_message(message.channel, '新しくプレイリストが作成されました')
+                await message.channel.send('新しくプレイリストが作成されました')
                 await log.MusicLog('Make play list {}'.format(PlayListName))
             return
         if '--list-delete' in cmd:
@@ -565,13 +622,13 @@ async def on_message(message):
             if PlayListName in PlayListFiles.keys() and not 'default' == PlayListName:
                 del PlayListFiles[PlayListName]
                 SaveBinData(PlayListFiles, args.playlist)
-                await client.send_message(message.channel, '{}を削除します'.format(PlayListName))
+                await message.channel.send('{}を削除します'.format(PlayListName))
                 await log.MusicLog('Remove play list {}'.format(PlayListName))
                 if NowPlayList == PlayListName:
                     NowPlayList = 'default'
                     PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
-                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await message.channel.send('そのプレイリストは存在しません')
                 await log.ErrorLog('Delete request not exist play list')
             return
         if '--list-rename' in cmd:
@@ -582,7 +639,7 @@ async def on_message(message):
                 await NotArgsment(log, client, message)
                 return
             if sufPlayListName in PlayListFiles.keys() and not 'default' == prePlayListName:
-                await client.send_message(message.channel, 'そのプレイリストはすでに存在します')
+                await message.channel.send('そのプレイリストはすでに存在します')
                 await log.ErrorLog('Make request exist play list')
             elif prePlayListName in PlayListFiles.keys() and not 'default' == prePlayListName:
                 PlayListFiles[sufPlayListName] = deepcopy(PlayListFiles[prePlayListName])
@@ -590,13 +647,13 @@ async def on_message(message):
                 del PlayListFiles[prePlayListName]
                 SaveBinData(PlayListFiles, args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
-                await client.send_message(message.channel, '{}の名前を{}に変更します'.format(prePlayListName, sufPlayListName))
+                await message.channel.send('{}の名前を{}に変更します'.format(prePlayListName, sufPlayListName))
                 await log.MusicLog('Rename play list {}'.format(prePlayListName))
             elif 'default' == prePlayListName:
-                await client.send_message(message.channel, 'defaultを変更することは出来ません')
+                await message.channel.send('defaultを変更することは出来ません')
                 await log.ErrorLog('Cannot renaem default')
             else:
-                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await message.channel.send('そのプレイリストは存在しません')
                 await log.ErrorLog('Rename request not exist play list')
             return
         if '--list-clear' in cmd:
@@ -606,18 +663,18 @@ async def on_message(message):
                 await NotArgsment(log, client, message)
             if ClearPlaylist in PlayListFiles.keys():
                 PlayListFiles[ClearPlaylist] = {}
-                await client.send_message(message.channel, '{}をクリアしました'.format(ClearPlaylist))
+                await message.channel.send('{}をクリアしました'.format(ClearPlaylist))
                 await log.MusicLog('Cleared {}'.format(ClearPlaylist))
                 SaveBinData(PlayListFiles, args.playlist)
                 PlayURLs = list(PlayListFiles[NowPlayList].keys())
             else:
-                await client.send_message(message.channel, 'そのプレイリストは存在しません')
+                await message.channel.send('そのプレイリストは存在しません')
                 await log.ErrorLog('Clear request not exist play list')
             return
         if '--list-clear-all' in cmd:
             for key in PlayListFiles.keys():
                 PlayListFiles[key] = {}
-                await client.send_message(message.channel, '{}をクリアしました'.format(key))
+                await message.channel.send('{}をクリアしました'.format(key))
                 await log.MusicLog('Cleared {}'.format(key))
             SaveBinData(PlayListFiles, args.playlist)
             return
@@ -636,7 +693,7 @@ async def on_message(message):
                 if len(PlayURLs) >= 1: music = randint(0, len(PlayURLs)-1)
                 elif len(PlayURLs) == 0: music = 0
                 else:
-                    await client.send_message(message.channel, 'プレイリストに曲が入ってないよ！')
+                    await message.channel.send('プレイリストに曲が入ってないよ！')
                     await log.ErrorLog('Not music in playlist')
                     return
                 try:
@@ -646,12 +703,12 @@ async def on_message(message):
                     if not urlUseFlag: PlayURLs.remove(PlayURLs[music if RandomFlag else 0])
                     if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
                     PlayFlag = True
-                    await client.change_presence(game=discord.Game(name='MusicPlayer'))
+                    #await client.change_presence(game=discord.Game(name='MusicPlayer'))
                 except discord.errors.InvalidArgument:
                     pass
                 except discord.ClientException:
                     await log.ErrorLog('Already Music playing')
-                    await client.send_message(message.channel, 'Already Music playing')
+                    await message.channel.send('Already Music playing')
             cmdFlag = True
         if '-r' in cmd:
             RandomFlag = True
@@ -668,7 +725,7 @@ async def on_message(message):
             cmdFlag = True
         if '--stop' in cmd:
             if player is None:
-                await client.send_message(message.channel, '今、プレイヤーは再生してないよ！')
+                await message.channel.send('今、プレイヤーは再生してないよ！')
                 await log.ErrorLog('Not play music')
                 return
             await client.change_presence(game=(None if not IbotFlag else discord.Game(name='IBOT')))
@@ -698,23 +755,23 @@ async def on_message(message):
             link = link.replace('https://youtu.be/', '')
             if not link in PlayListFiles[ListName]:
                 try:
-                    PlayListFiles[ListName][link] = YoutubeDL().extract_info(url=link, download=False, process=False)['title']
+                    PlayListFiles[ListName][link] = youtube_dl.YoutubeDL().extract_info(url=link, download=False, process=False)['title']
                     PlayURLs.append(link)
                     await log.MusicLog('Add {}'.format(link))
                     ineed[-1] += '-{}\n'.format(PlayListFiles[ListName][link])
                     NotFound = False
                     if len(ineed[-1]) > 750:
-                        await EmbedOut(client, message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
+                        await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
                         ineed.append('')
                         NotFound = True
                 except:
-                    await client.send_message(message.channel, '{} なんて無いよ'.format(linkraw))
+                    await message.channel.send('{} なんて無いよ'.format(linkraw))
                     await log.ErrorLog('{} is Not Found'.format(linkraw))
             else:
                 await log.MusicLog('Music Overlap {}'.format(link))
-                await client.send_message(message.channel, 'その曲もう入ってない？')
+                await message.channel.send('その曲もう入ってない？')
         SaveBinData(PlayListFiles, args.playlist)
-        if not ineed[-1] == '' and not NotFound: await EmbedOut(client, message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
+        if not ineed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Wish List page {}'.format(len(ineed)), 'Music', ineed[-1], 0x303030)
     elif message.content.startswith(prefix+'delmusic'):
         NotFound = True
         links = message.content.split()[1:]
@@ -739,14 +796,14 @@ async def on_message(message):
                 notneed[-1] += '-{}\n'.format(Title)
                 await log.MusicLog('Del {}'.format(link))
                 if len(notneed[-1]) > 750:
-                    await EmbedOut(client, message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
+                    await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
                     notneed.append('')
                     NotFound = True
             except:
                 await log.ErrorLog('{} not exist list'.format(link))
-                await client.send_message(message.channel, 'そんな曲入ってたかな？')
+                await message.channel.send('そんな曲入ってたかな？')
         SaveBinData(PlayListFiles, args.playlist)
-        if not notneed[-1] == '' and not NotFound: await EmbedOut(client, message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
+        if not notneed[-1] == '' and not NotFound: await EmbedOut(message.channel, 'Delete List page {}'.format(len(notneed)), 'Music', notneed[-1], 0x749812)
         if len(PlayURLs) == 0: PlayURLs = list(PlayListFiles[NowPlayList].keys())
     elif message.content.startswith(prefix+'help'):
         cmds = message.content.split()
@@ -758,14 +815,14 @@ async def on_message(message):
                         cmdline += key + ': ' + value + '\n'
                     embed = discord.Embed(description=cmd+' Commmand List', colour=0x008b8b)
                     embed.add_field(name='Commands', value=cmdline, inline=True)
-                    await client.send_message(message.channel, embed=embed)
+                    await message.channel.send(embed=embed)
         else:
             cmdline = ''
             for key, value in CommandDict['help'].items():
                 cmdline += key + ': ' + value + '\n'
             embed = discord.Embed(description='Commmand List', colour=0x4169e1)
             embed.add_field(name='Commands', value=cmdline, inline=True)
-            await client.send_message(message.channel, embed=embed)
+            await message.channel.send(embed=embed)
     elif message.content.startswith(prefix+'spell'):
         cmd = message.content.split()
         if '--list' in cmd:
@@ -775,10 +832,10 @@ async def on_message(message):
                 if not spell == 'SpellList': SpellName[-1] += spell + '\n'
                 if len(SpellName[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(client, message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
+                    await EmbedOut(message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
                     SpellName.append('')
             if not OutFlag or SpellName[-1]:
-                await EmbedOut(client, message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
+                await EmbedOut(message.channel, disc='Spell List', playname='Spells', url=SpellName[-1], color=0x000000)
             return
         elif '--spell' in cmd:
             SpellName = CmdSpliter(cmd, cmd.index('--spell')+1)
@@ -788,10 +845,10 @@ async def on_message(message):
                 if not spell == 'SpellList': Spelltext[-1] += spell + '\n'
                 if len(Spelltext[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(client, message.channel, disc='Spell', playname='Spells text', url=Spelltext[-1], color=0x000000)
+                    await EmbedOut(message.channel, disc='Spell', playname='Spells text', url=Spelltext[-1], color=0x000000)
                     Spelltext.append('')
             if not OutFlag or Spelltext[-1]:
-                await EmbedOut(client, message.channel, disc='Spell', playname='Spell text', url=Spelltext[-1], color=0x000000)
+                await EmbedOut(message.channel, disc='Spell', playname='Spell text', url=Spelltext[-1], color=0x000000)
             return
         elif '--del' in cmd:
             SpellName = CmdSpliter(cmd, cmd.index('--del')+1)
@@ -818,10 +875,10 @@ async def on_message(message):
                 Subject[-1] += sub + '\n'
                 if len(Subject[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(client, message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
+                    await EmbedOut(message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
                     Subject.append('')
             if not OutFlag or Subject[-1]:
-                await EmbedOut(client, message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
+                await EmbedOut(message.channel, disc='Subject List', playname='Subject', url=Subject[-1], color=0x000000)
             return
         elif '--list-unit' in cmd:
             CmdFlag = True
@@ -832,10 +889,10 @@ async def on_message(message):
                 Unit[-1] += unit + '\n'
                 if len(Unit[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(client, message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
+                    await EmbedOut(message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
                     Unit.append('')
             if not OutFlag or Unit[-1]:
-                await EmbedOut(client, message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
+                await EmbedOut(message.channel, disc='Unit List', playname='Unit', url=Unit[-1], color=0x000000)
             return
         elif '--list-ques' in cmd:
             CmdFlag = True
@@ -847,10 +904,10 @@ async def on_message(message):
                 QuesAns[-1] += ques + '  -  Ans:' + ans + '\n'
                 if len(QuesAns[-1]) > 750:
                     OutFlag = True
-                    await EmbedOut(client, message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
+                    await EmbedOut(message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
                     QuesAns.append('')
             if not OutFlag or QuesAns[-1]:
-                await EmbedOut(client, message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
+                await EmbedOut(message.channel, disc='Question List', playname='Question & Answer', url=QuesAns[-1], color=0x000000)
             return
         elif '--del' in cmd:
             CmdFlag = True
@@ -862,20 +919,20 @@ async def on_message(message):
             else:DelObj = cmd[cmd.index('--del')+2]
             backunm = Study.DelStudy(DelObj, DelKey)
             if backunm == 0:
-                await client.send_message(message.channel, '問題を削除します')
+                await message.channel.send('問題を削除します')
                 await log.Log("Delete {}: {}".format(DelKey, DelObj))
             elif backunm == -1:
                 await log.ErrorLog("Question:{} is wrong".format(DelObj))
-                await client.send_message(message.channel, 'Question名: {} は見つかりませんでした'.format(DelObj))
+                await message.channel.send('Question名: {} は見つかりませんでした'.format(DelObj))
             elif backunm == -2:
                 await log.ErrorLog("Unit:{} is wrong".format(DelObj))
-                await client.send_message(message.channel, 'Unit名: {} は見つかりませんでした'.format(DelObj))
+                await message.channel.send('Unit名: {} は見つかりませんでした'.format(DelObj))
             elif backunm == -3:
                 await log.ErrorLog("Subject:{} is wrong".format(DelObj))
-                await client.send_message(message.channel, 'Subject名: {} は見つかりませんでした'.format(DelObj))
+                await message.channel.send('Subject名: {} は見つかりませんでした'.format(DelObj))
             elif backunm == -4:
                 await log.ErrorLog("DelKey:{} is wrong".format(DelKey))
-                await client.send_message(message.channel, 'DelKeyの指定が間違っています')
+                await message.channel.send('DelKeyの指定が間違っています')
         elif '--add' in cmd:
             CmdFlag = True
             Subject, index = CmdSpliter(cmd, cmd.index('--add')+1, sufIndex=True)
@@ -885,15 +942,15 @@ async def on_message(message):
                 Ans, index = CmdSpliter(cmd, index+1, sufIndex=True)
                 Study.AddStudy(Subject, Unit, [Ques,], [Ans,])
                 await log.Log("Unit:{} Ques:{} - ans:{}".format(Unit, Ques, Ans))
-                await client.send_message(message.channel, '問題を追加します')
+                await message.channel.send('問題を追加します')
             except:
                 await log.ErrorLog("Input ques and ans is wrong type")
-                await client.send_message(message.channel, '入力の形式が違います')
+                await message.channel.send('入力の形式が違います')
         elif '--add-m' in cmd:
             CmdFlag = True
             Qs = []
             As = []
-            await client.send_message(message.channel, '問題を複数追加します')
+            await message.channel.send('問題を複数追加します')
             Subject, index = CmdSpliter(cmd, cmd.index('--add-m')+1, sufIndex=True)
             Unit, index = CmdSpliter(cmd, index+1, sufIndex=True)
             for QuesAns in cmd[index+1:]:
@@ -904,11 +961,11 @@ async def on_message(message):
                     await log.Log("Unit:{} Ques:{} - ans:{}".format(Unit, Ques, Ans))
                 except:
                     await log.ErrorLog("[{}] is wrong type".format(QuesAns))
-                    await client.send_message(message.channel, '入力の形式が違います')
+                    await message.channel.send('入力の形式が違います')
             Study.AddStudy(Subject, Unit, Qs, As)
         elif '--score' in cmd:
             CmdFlag = True
-            await client.send_message(message.channel, '前回の成績')
+            await message.channel.send('前回の成績')
             await ScoreOut(message)
         elif '--start' in cmd:
             CmdFlag = True
@@ -930,54 +987,54 @@ async def on_message(message):
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
             AnsUserDic = {}
-            await client.send_message(message.channel, 'それではスタート')
-            await client.send_message(message.channel, '問題です\n残り{}/全問{}\n{} '.format(len(QuesDic)+1, QuesLen, Q))
+            await message.channel.send('それではスタート')
+            await message.channel.send('問題です\n残り{}/全問{}\n{} '.format(len(QuesDic)+1, QuesLen, Q))
         if not CmdFlag: await OptionError(log, client, message, cmd)
     elif message.content.startswith(prefix+'book'):
         cmd = message.content.split()[1:]
         if cmd[0] == '--add':
             if cmd[1] in BooksData.keys():
-                await client.send_message(message.channel, 'すでに書籍が登録してあります。別の名前で登録してください')
+                await message.channel.send('すでに書籍が登録してあります。別の名前で登録してください')
             else:
                 BooksData[cmd[1]] = books.BookData(cmd[1], cmd[2], cmd[3])
                 SaveBinData(BooksData, args.book)
-                await client.send_message(message.channel, '書籍の登録が完了しました')
+                await message.channel.send('書籍の登録が完了しました')
                 BookDataHash[BooksData[cmd[1]].code] = cmd[1]
         elif cmd[0] == '--del':
             if not cmd[1] in BooksData.keys():
-                await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
+                await message.channel.send('同名の書籍が存在しません。再度確認をしてください')
             else:
                 del BookDataHash[BooksData[cmd[1]].code]
                 del BooksData[cmd[1]]
                 SaveBinData(BooksData, args.book)
-                await client.send_message(message.channel, '書籍の削除が完了しました')
+                await message.channel.send('書籍の削除が完了しました')
         elif '--borrow' in cmd[0]:
             if '-hash' in cmd[0]: name = BookDataHash[cmd[1]]
             elif cmd[0] == '--borrow': name = cmd[1]
-            else: await client.send_message(message.channel, 'オプションの選択が間違っています')
+            else: await message.channel.send('オプションの選択が間違っています')
             if not name in BooksData.keys():
-                await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
+                await message.channel.send('同名の書籍が存在しません。再度確認をしてください')
                 return
             status = BooksData[name].LendingBook(message.author.name, message.author.id)
             if status == 0:
-                await client.send_message(message.channel, '正常に貸出処理が完了しました')
+                await message.channel.send('正常に貸出処理が完了しました')
             elif status == -1:
-                await client.send_message(message.channel, '只今貸出中です。返却処理が終わってから再度貸出処理を行ってください')
+                await message.channel.send('只今貸出中です。返却処理が終わってから再度貸出処理を行ってください')
             SaveBinData(BooksData, args.book)
         elif cmd[0] == '--return':
             if '-hash' in cmd[0]: name = BookDataHash[cmd[1]]
             elif cmd[0] == '--return': name = cmd[1]
-            else: await client.send_message(message.channel, 'オプションの選択が間違っています')
+            else: await message.channel.send('オプションの選択が間違っています')
             if not name in BooksData.keys():
-                await client.send_message(message.channel, '同名の書籍が存在しません。再度確認をしてください')
+                await message.channel.send('同名の書籍が存在しません。再度確認をしてください')
                 return
             status = BooksData[name].ReturnBook(message.author.name, message.author.id)
             if status == 0:
-                await client.send_message(message.channel, '正常に返却処理が完了しました')
+                await message.channel.send('正常に返却処理が完了しました')
             elif status == -1:
-                await client.send_message(message.channel, '貸出処理が行われていません。貸出処理を行ってから返却処理を行ってください')
+                await message.channel.send('貸出処理が行われていません。貸出処理を行ってから返却処理を行ってください')
             elif status == -10:
-                await client.send_message(message.channel, '貸出ユーザとIDが違います。返却処理は本人が行ってください')
+                await message.channel.send('貸出ユーザとIDが違います。返却処理は本人が行ってください')
             SaveBinData(BooksData, args.book)
         elif cmd[0] == '--list':
             listbook = ''
@@ -985,7 +1042,7 @@ async def on_message(message):
             for key in BooksData.keys():
                 datalist = BooksData[key].GetBookInfo(data = (None if (len(cmd) == 1) else cmd[1]))
                 if datalist == 0:
-                    await client.send_message(message.channel, '表示項目の指定が間違っています')
+                    await message.channel.send('表示項目の指定が間違っています')
                     return
                 if len(datalist) == 2:
                     listbook += datalist[0] + ': ' + ('貸出中' if datalist[1] else '貸出可')+'\n'
@@ -993,11 +1050,11 @@ async def on_message(message):
                     listbook += datalist[0] + ': ' + ('N/A' if datalist[1] is None else datalist[1]) + ': '+ ('貸出中' if datalist[2] else '貸出可')+'\n'
                 if len(listbook) > 750:
                     if len(cmd) == 1:
-                        await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x5042f4)
+                        await EmbedOut(message.channel, disc='Books List', playname='Book name', url=listbook, color=0x5042f4)
                     listbook = ''
                     outFlag = True
             if not outFlag:
-                await EmbedOut(client, message.channel, disc='Books List', playname='Book name', url=listbook, color=0x5042f4)
+                await EmbedOut(message.channel, disc='Books List', playname='Book name', url=listbook, color=0x5042f4)
     elif message.content.startswith(prefix+'exit'):
         AdminCheck = (message.author.id == config['ADMINDATA']['botowner'] if config['ADMINDATA']['botowner'] != 'None' else False)
         if TrueORFalse[config['ADMINDATA']['passuse']] and not AdminCheck:
@@ -1014,12 +1071,12 @@ async def on_message(message):
         if not message.author.name in AnsUserDic:
             AnsUserDic[message.author.name] = 0
         if '--exit' in cmd:
-            await client.send_message(message.channel, '終わります')
+            await message.channel.send('終わります')
             QuesFlag = False
             QuesDic = []
             return
         elif '--next' in cmd:
-            await client.send_message(message.channel, '正解は{}でしたー'.format(A))
+            await message.channel.send('正解は{}でしたー'.format(A))
         else:
             if message.content.startswith(prefix+'ans'): ans = CmdSpliter(cmd, 1)
             else: ans = message.content
@@ -1027,38 +1084,38 @@ async def on_message(message):
             if not LockFlag:
                 if re.match(A, ans):
                     LockFlag = True
-                    await client.send_message(message.channel, '正解！')
+                    await message.channel.send('正解！')
                     AnsUserDic[message.author.name] += 1
                 else:
-                    await client.send_message(message.channel, 'は、こんなんも分からんのか\nもう一回やって')
+                    await message.channel.send('は、こんなんも分からんのか\nもう一回やって')
                     return 
             else: return
         try:
             Q = choice(list(QuesDic.keys()))
             A = QuesDic.pop(Q)
-            await client.send_message(message.channel, 'はい、次')
-            await client.send_message(message.channel, '張り切ってどうぞ')
-            await client.send_message(message.channel, '残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
+            await message.channel.send('はい、次')
+            await message.channel.send('張り切ってどうぞ')
+            await message.channel.send('残り{}/全問{}\n{}'.format(len(QuesDic)+1, QuesLen, Q))
         except:
-            await client.send_message(message.channel, 'しゅーりょー')
-            await client.send_message(message.channel, '成績')
+            await message.channel.send('しゅーりょー')
+            await message.channel.send('成績')
             await ScoreOut(message)
             QuesFlag = False
             QuesDic = []
         LockFlag = False
     elif message.content.startswith(prefix+'version'):
         await log.Log(version)
-        await client.send_message(message.channel, version)
+        await message.channel.send(version)
         if IbotFlag:
             await log.Log(InteractiveBot.__version__)
-            await client.send_message(message.channel, InteractiveBot.__version__)
+            await message.channel.send(InteractiveBot.__version__)
     elif message.content.startswith(prefix+'debug'):
-        await client.send_message(message.channel, client.email)
+        await message.channel.send(client.email)
     elif message.content.startswith(prefix+'say'):
         cmds = message.content.split()[1:]
         out = ''
         for cmd in cmds: out += cmd+' '
-        await client.send_message(message.channel, out)
+        await message.channel.send(out)
         await log.Log('Bot say {}'.format(out))
     elif message.content.startswith(prefix+'cal'):
         cmd = message.content.split()
@@ -1066,10 +1123,12 @@ async def on_message(message):
             EventDay = cmd[cmd.index('--add')+1]
             EventName = cmd[cmd.index('--add')+2]
             EventContent = cmd[cmd.index('--add')+3]
-            Cal.CalRegister(EventDay, EventName, EventContent, message.channel)
+            CalData[EventName] = Calendar(EventDay, EventName, EventContent)
+            print(CalData[EventName])
+            SaveBinData(CalData, args.schedule)
+            await message.channel.send('イベントを追加しました\n{}\n{}\n{}'.format(EventDay, EventName, EventContent))
         if '--print' in cmd:
-            await Cal.CalTask()
-            await client.send_message(message.channel, str(Cal.CalData))
+            await message.channel.send(str(CalData))
     elif message.content.startswith(prefix+'ibot'):
         cmd = message.content.split()
         if TrueORFalse[config['BOTMODE']['ibot_mode']]:
@@ -1077,28 +1136,39 @@ async def on_message(message):
                 if not IbotFlag:
                     IbotFlag = True
                     InteractiveBot = retain.retain.Bot(Spell)
-                    await client.send_message(message.channel, 'インタラクティブボットモードをONにしました')
+                    await message.channel.send('インタラクティブボットモードをONにしました')
                     await log.Log('Interactive bot mode is ON')
                     await client.change_presence(game=discord.Game(name='IBOT'))
                 else:
-                    await client.send_message(message.channel, 'インタラクティブモードはすでにONになっています')
+                    await message.channel.send('インタラクティブモードはすでにONになっています')
                     await log.ErrorLog('Already interractive bot mode is ON')
             elif '--stop' in cmd:
                 if IbotFlag:
                     IbotFlag = False
                     InteractiveBot = None
-                    await client.send_message(message.channel, 'インタラクティブボットモードをOFFにしました')
+                    await message.channel.send('インタラクティブボットモードをOFFにしました')
                     await log.Log('Interactive bot mode is OFF')
                     await client.change_presence(game=(None if not PlayFlag else discord.Game(name='MusicPlayer')))
                 else:
-                    await client.send_message(message.channel, 'インタラクティブモードはすでにOFFになっています')
+                    await message.channel.send('インタラクティブモードはすでにOFFになっています')
                     await log.ErrorLog('Already interractive bot mode is OFF')
             else: await OptionError(log, client, message, cmd)
         else:
-            await client.send_message(message.channel, '現在このコマンドは無効化されています')
+            await message.channel.send('現在このコマンドは無効化されています')
             await log.ErrorLog('Ibot mode is Disable')
+    elif message.content.startswith(prefix+'job'):
+        cmd = message.content.split()
+        if cmd[1] == '--start':
+            JobControl(config['USER'][str(message.author.id)], 'start')
+        elif cmd[1] == '--end':
+            JobControl(config['USER'][str(message.author.id)], 'end')
+        elif cmd[1] == '--print':
+            if config['OUTFILE']['cmd'] == 'sh':
+                subprocess.call(['sh', 'jobout.sh'])
+            elif config['OUTFILE']['cmd'] == 'bat':
+                subprocess.call('jobout.bat')
     elif message.content.startswith(prefix+'pwd'):
-        await client.send_message(message.channel, os.getcwd())
+        await message.channel.send(os.getcwd())
     elif message.content.startswith(prefix+'ls'):
         cmds = message.content.split()
         AllFlag = False
@@ -1117,9 +1187,9 @@ async def on_message(message):
                 else:files[-1] += '{}\t'.format(fil) if os.path.isfile(nowdir+'/'+fil) else '**{}**\t'.format(fil)
                 if len(files[-1]) > 750:
                     files[-1] += '\n'
-                    await client.send_message(message.channel, files[-1])
+                    await message.channel.send(files[-1])
                     files.append('')
-        await client.send_message(message.channel, files[-1])
+        await message.channel.send(files[-1])
     elif message.content.startswith(prefix+'cd'):
         cmds = message.content.split()
         if len(cmds) == 1:
@@ -1138,16 +1208,16 @@ async def on_message(message):
                 if len(line) == 1: lines[-1] += line
                 else: lines[-1] += '`{}`\n'.format(line.replace('\n', ''))
                 if len(lines[-1]) > 750:
-                    await client.send_message(message.channel, lines[-1])
+                    await message.channel.send(lines[-1])
                     lines.append('')
-            if not outFlag or not lines[-1] == '': await client.send_message(message.channel, lines[-1])
+            if not outFlag or not lines[-1] == '': await message.channel.send(lines[-1])
     elif message.content.startswith(prefix):
-        await client.send_message(message.channel, '該当するコマンドがありません')
+        await message.channel.send('該当するコマンドがありません')
         await log.ErrorLog('Command is notfound')
     elif IbotFlag and not message.author.bot:
         comment = InteractiveBot.Response(message.content)
         if not comment is None:
-            await client.send_message(message.channel, comment)
+            await message.channel.send(comment)
             await log.Log('ibot return {}'.format(comment))
 
 @client.event
